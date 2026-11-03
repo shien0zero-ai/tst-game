@@ -1,288 +1,349 @@
 /**
- * ゲーム全体の入口。
- * HTML の画面、キーボード・マウス入力、地形、物理演算、3D 描画をつなぐ。
- * 地形そのものの管理は world.js、当たり判定は physics.js に任せる。
+ * ゲームの入口。入力、画面の切替、地形、物理計算、描画をつなぐ。
+ * start / playing / pause / inventory を分け、メニューの操作で地形を変えないようにする。
  */
-
-// 見た目の CSS を読み込む。Vite が開発時の反映や配布用への取り込みを行う。
 import './style.css';
 import './settings.css';
-// Three.js のベクトル計算と、自作の地形・プレイヤー・描画・設定機能を読み込む。
+import './game-ui.css';
 import * as THREE from 'three';
 import { createWorld, raycastVoxel, BLOCK_TYPES } from './world.js';
 import { PlayerPhysics, EYE_HEIGHT } from './physics.js';
 import { WorldView } from './render.js';
 import { createSensitivitySettings } from './settings.js';
+import { createKeybindingsSettings, formatKey } from './keybindings.js';
+import { createKeybindPanel } from './keybind-panel.js';
+import { createInventory } from './inventory.js';
+import { createFpsCounter } from './fps.js';
 
-// 内部で使う英語のブロック名を、画面に表示する日本語へ変換する。
+// 内部のブロック名を表示用の日本語へ変換する。$ は id で HTML を探す省略形。
 const NAMES = { grass: '草ブロック', dirt: '土', stone: '石', wood: '原木', leaves: '葉', sand: '砂' };
-// HTML の id から要素を探す処理を短く書くための関数。
-const $ = (id) => document.getElementById(id);
+const $ = id => document.getElementById(id);
 const canvas = $('world');
-// 押しているキーを記憶する。複数キーを同時に押す斜め移動にも対応できる。
 const keys = new Set();
-// 前回の感度をブラウザから読み込む。保存不可の場合も標準値で起動できる。
 const sensitivity = createSensitivitySettings();
-// 初期化後に使う描画担当・地形データ・プレイヤーを保持する。
-let view, world, player;
-// ready は起動完了、locked はマウス捕捉中、selected は選択ブロックの番号。
-// target は照準が指しているブロックで、何も指していなければ null になる。
-let ready = false, locked = false, selected = 0, target = null;
-// yaw は左右、pitch は上下の視点角度。単位はラジアン。
-let yaw = -.24, pitch = -.12;
-// 前の描画時刻と、お知らせを消すタイマーの識別子を覚える。
-let previousTime = 0, toastTimer;
-// 視線の向きを表すベクトルは使い回し、毎フレームの作り直しを避ける。
+const bindings = createKeybindingsSettings();
+const inventory = createInventory();
+const fpsCounter = createFpsCounter();
 const direction = new THREE.Vector3();
+const icons = new Map();
+let view, world, player;
+let ready = false, locked = false, mode = 'start', target = null;
+let nextUnlockMode = 'pause';
+let yaw = -.24, pitch = -.12;
+let previousTime = 0, toastTimer;
 
-// 設定の数値をスライダー・表示・読み上げ用の情報へ反映する。
+// 短い案内を表示し、2.4 秒後に隠す。前の消去予約は取り消してから上書きする。
+function notify(message) {
+  clearTimeout(toastTimer);
+  $('toast').textContent = message;
+  $('toast').hidden = false;
+  toastTimer = setTimeout(() => { $('toast').hidden = true; }, 2400);
+}
+
+// 保存された感度を、数値・読み上げ用属性・スライダーの塗り分けに反映する。
 function updateSensitivityControls(result) {
   const value = sensitivity.value;
   const slider = $('mouse-sensitivity');
   slider.value = value;
   slider.setAttribute('aria-valuetext', `${value}%`);
-  // 感度の最小〜最大を 0〜100% に換算し、スライダーの塗り分けに使う。
   slider.style.setProperty('--range-progress', `${(value - Number(slider.min)) / (Number(slider.max) - Number(slider.min)) * 100}%`);
   $('sensitivity-value').textContent = `${value}%`;
-  // 実際に変更したときは、保存できたかも伝える。起動直後は既存の案内を残す。
-  if (result) {
-    $('sensitivity-note').textContent = result.saved
-      ? 'このブラウザに保存しました · 次回起動時も使えます'
-      : '今回の操作には反映済みです · ブラウザへの保存はできませんでした';
+  if (result) $('sensitivity-note').textContent = result.saved
+    ? 'このブラウザに保存しました · 次回起動時も使えます'
+    : '今回の操作には反映済みです · ブラウザへの保存はできませんでした';
+}
+$('mouse-sensitivity').addEventListener('input', event => updateSensitivityControls(sensitivity.set(event.target.value)));
+$('sensitivity-reset').addEventListener('click', () => updateSensitivityControls(sensitivity.reset()));
+updateSensitivityControls();
+
+// 実際に割り当てたキーで説明を描く。文字列は HTML として解釈せず DOM に入れる。
+function keyHint(action, description) {
+  const wrapper = document.createElement('span');
+  const key = document.createElement('kbd');
+  key.textContent = formatKey(bindings.get(action));
+  wrapper.append(key, ` ${description}`);
+  return wrapper;
+}
+function refreshBindingHints() {
+  keys.clear();
+  $('intro-controls').replaceChildren(
+    keyHint('forward', '前進'), keyHint('left', '左'), keyHint('backward', '後退'),
+    keyHint('right', '右'), keyHint('jump', 'ジャンプ'), keyHint('inventory', '持ち物'),
+  );
+  const fixedHelp = document.createElement('span');
+  fixedHelp.textContent = '左クリック 壊す / 右クリック 置く';
+  const pauseHint = document.createElement('span');
+  pauseHint.textContent = 'Esc 設定';
+  $('quick-help').replaceChildren(fixedHelp, keyHint('inventory', '持ち物'), pauseHint);
+  $('inventory-controls').textContent = `${formatKey(bindings.get('inventory'))} で閉じる · Esc で設定へ`;
+  if (ready) refreshInventory();
+}
+
+// キー捕捉の処理は、ゲームのキー処理よりも先に呼ぶ。設定中の入力で移動させない。
+const keybindPanel = createKeybindPanel({
+  settings: bindings, listElement: $('keybind-list'), noteElement: $('keybind-note'),
+  resetButton: $('keybind-reset'), onChange: refreshBindingHints,
+});
+
+// Esc 画面のタブを切り替える。途中のキー入力待ちは取り消してから隠す。
+function showSettingsTab(tab) {
+  keybindPanel.cancel();
+  const mouse = tab === 'mouse';
+  $('sensitivity-settings').hidden = !mouse;
+  $('keybind-settings').hidden = mouse;
+  $('mouse-tab').setAttribute('aria-selected', String(mouse));
+  $('keys-tab').setAttribute('aria-selected', String(!mouse));
+}
+$('mouse-tab').addEventListener('click', () => showSettingsTab('mouse'));
+$('keys-tab').addEventListener('click', () => showSettingsTab('keys'));
+
+// 二つの画面にあるホットバーを、同じインベントリの状態へそろえる。
+function refreshInventory() {
+  const slots = inventory.slots;
+  for (const container of [$('hotbar'), $('inventory-hotbar')]) {
+    [...container.children].forEach((button, index) => {
+      const type = slots[index];
+      const label = formatKey(bindings.get(`slot${index + 1}`));
+      button.dataset.type = type;
+      button.classList.toggle('selected', index === inventory.selected);
+      button.setAttribute('aria-pressed', String(index === inventory.selected));
+      button.setAttribute('aria-label', `${index + 1}: ${NAMES[type]}`);
+      button.title = `${label} · ${NAMES[type]}`;
+      button.querySelector('span').textContent = label;
+      button.querySelector('img').src = icons.get(type);
+    });
+  }
+  [...$('inventory-grid').children].forEach(button => {
+    button.setAttribute('aria-pressed', String(button.dataset.type === inventory.selectedType));
+  });
+  $('selected-name').textContent = NAMES[inventory.selectedType];
+}
+function selectBlock(index) {
+  inventory.select(index);
+  refreshInventory();
+}
+
+// 初回だけ選択ボタンを組み立てる。画像は生成済みのアイコンを使い回す。
+function buildInventoryUI() {
+  for (const type of BLOCK_TYPES) icons.set(type, view.blockIcon(type));
+  for (const container of [$('hotbar'), $('inventory-hotbar')]) {
+    inventory.slots.forEach((_, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = container.id === 'hotbar' ? 'slot' : 'inventory-slot';
+      button.dataset.slot = index;
+      const number = document.createElement('span');
+      const image = document.createElement('img');
+      image.alt = '';
+      button.append(number, image);
+      button.addEventListener('click', () => selectBlock(index));
+      container.append(button);
+    });
+  }
+  for (const type of BLOCK_TYPES) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'inventory-item';
+    button.dataset.type = type;
+    const image = document.createElement('img');
+    image.src = icons.get(type);
+    image.alt = '';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = NAMES[type];
+    const amount = document.createElement('small');
+    amount.textContent = '∞ 無制限';
+    button.append(image, name, amount);
+    // 選択中のスロットへ素材を登録する。画面は閉じず、続けて並べ替えられる。
+    button.addEventListener('click', () => {
+      inventory.assign(type);
+      refreshInventory();
+      $('inventory-note').textContent = `${inventory.selected + 1}番のスロットに「${NAMES[type]}」を入れました。`;
+    });
+    $('inventory-grid').append(button);
+  }
+  refreshInventory();
+}
+
+// 画面状態の切替を一か所に集める。表示中のメニューだけを操作できるようにする。
+function showMode(next) {
+  mode = next;
+  keys.clear();
+  keybindPanel.cancel();
+  $('menu').hidden = next === 'playing' || next === 'inventory';
+  $('inventory-menu').hidden = next !== 'inventory';
+  document.body.classList.toggle('playing', next === 'playing');
+  $('target-label').hidden = true;
+  if (next === 'pause') {
+    $('menu').classList.add('is-paused');
+    $('menu-title').textContent = 'ひと休み。';
+    $('menu-description').textContent = 'マウス感度と操作キーを、自分に合う設定に。';
+    $('settings-tabs').hidden = false;
+    showSettingsTab('mouse');
+    $('play-label').textContent = '草原にもどる';
+    $('menu-note').textContent = 'クリックで再開 · 変更したブロックはそのままです';
+    $('mouse-sensitivity').focus({ preventScroll: true });
+  } else if (next === 'inventory') {
+    refreshInventory();
+    $('inventory-grid').firstElementChild?.focus({ preventScroll: true });
   }
 }
 
-// ドラッグや矢印キーで感度を変えたら、設定を保存して画面を更新する。
-$('mouse-sensitivity').addEventListener('input', (event) => {
-  updateSensitivityControls(sensitivity.set(event.target.value));
-});
-// 「標準に戻す」は感度を 100% に戻し、その値を保存する。
-$('sensitivity-reset').addEventListener('click', () => {
-  updateSensitivityControls(sensitivity.reset());
-});
-// 起動時に、読み込んだ感度を非表示の設定画面にも反映しておく。
-updateSensitivityControls();
-
-// 画面下に短いお知らせを出す。続けて呼ばれたら前の消去タイマーを取り消す。
-function notify(message) {
-  clearTimeout(toastTimer);
-  $('toast').textContent = message;
-  $('toast').hidden = false;
-  // 2.4 秒経過したら、お知らせを隠す。
-  toastTimer = setTimeout(() => { $('toast').hidden = true; }, 2400);
+// 操作画面のボタンかキー操作から、実際のマウス捕捉をリクエストする。
+async function start() {
+  if (!ready) return;
+  keybindPanel.cancel();
+  if (!canvas.requestPointerLock) { notify('マウスを使えるPC版のブラウザで開いてください'); return; }
+  try { await canvas.requestPointerLock(); }
+  catch { notify('マウス操作を開始できませんでした。もう一度再開してください'); }
 }
 
-// 選択中のブロックと、画面下のパレットの強調表示を切り替える。
-function selectBlock(index) {
-  // 端を越えた番号は反対側へ戻すため、ホイールで何周でも切り替えられる。
-  selected = (index + BLOCK_TYPES.length) % BLOCK_TYPES.length;
-  document.querySelectorAll('.slot').forEach((button, i) => {
-    button.classList.toggle('selected', i === selected);
-    // 見た目だけでなく、スクリーンリーダーにも選択状態を伝える。
-    button.setAttribute('aria-pressed', String(i === selected));
-  });
-  $('selected-name').textContent = NAMES[BLOCK_TYPES[selected]];
+// 捕捉を解放した結果で画面を開く。Tab と Esc のどちらかを事前に記録する。
+function unlockTo(next) {
+  nextUnlockMode = next;
+  keys.clear();
+  if (locked) document.exitPointerLock();
+  else { nextUnlockMode = 'pause'; showMode(next); }
 }
+$('play-button').addEventListener('click', start);
+$('inventory-resume').addEventListener('click', start);
+$('inventory-close').addEventListener('click', start);
+$('help-button').addEventListener('click', () => {
+  if (ready && mode !== 'start') unlockTo('pause');
+});
+document.addEventListener('pointerlockchange', () => {
+  locked = document.pointerLockElement === canvas;
+  const next = locked ? 'playing' : nextUnlockMode;
+  nextUnlockMode = 'pause';
+  showMode(next);
+});
+document.addEventListener('pointerlockerror', () => notify('マウスの捕捉が許可されていません。PCのブラウザで直接開いてください'));
 
-// カメラの視線を使い、手の届く範囲で最初に当たるブロックを調べる。
+// 目の位置から視線を計算し、6ブロック以内で最初に当たる面を選ぶ。
 function refreshTarget() {
-  // 左右角と上下角から、長さ 1 の視線ベクトルを作る。
   direction.set(-Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
-  // プレイヤー座標は足元なので、目の高さを足す。操作できる距離は 6 ブロック。
   target = raycastVoxel(world, { x: player.position.x, y: player.position.y + EYE_HEIGHT, z: player.position.z }, direction, 6);
   $('target-label').hidden = !locked || !target;
   if (target) $('target-label').textContent = `${NAMES[target.type]} · ${target.distance.toFixed(1)} m`;
 }
 
-// 左クリックで破壊、右クリックで隣のマスへ設置する。
+// 左で破壊、右で設置。素材は固定の一覧ではなく、現在のホットバーから読む。
 function editBlock(button) {
-  // 前フレームの照準ではなく、クリックした瞬間の視線で対象を取り直す。
   refreshTarget();
   if (!target) { notify('ブロックに近づいて、照準を合わせてください'); return; }
   let changed = false;
-  // マウスの button 番号は、左が 0、右が 2。
   if (button === 0) changed = world.remove(target.x, target.y, target.z);
   if (button === 2) {
-    // normal は指した面の外向き方向。これを足すと、その面の隣のマスになる。
     const { normal } = target;
     const x = target.x + normal.x, y = target.y + normal.y, z = target.z + normal.z;
-    // プレイヤーがブロックに埋まってしまう設置は拒否する。
     if (player.intersectsBlock(x, y, z)) { notify('自分と重なる場所には置けません'); return; }
-    changed = world.set(x, y, z, BLOCK_TYPES[selected]);
+    changed = world.set(x, y, z, inventory.selectedType);
     if (!changed) notify('ここにはブロックを置けません');
   }
-  // 地形が変わった場合だけ 3D メッシュを作り直し、照準も更新する。
-  if (changed) {
-    view.rebuild(world);
-    refreshTarget();
-  }
+  if (changed) { view.rebuild(world); refreshTarget(); }
 }
 
-// 開始・再開ボタンから呼び、マウスをゲーム画面に捕捉する。
-async function start() {
-  if (!ready) return;
-  // Pointer Lock API がない環境では操作できるブラウザを案内する。
-  if (!canvas.requestPointerLock) {
-    $('menu-note').textContent = 'マウスを使えるPC版の Chrome / Edge / Firefox で開いてください。';
-    return;
-  }
-  // 捕捉はブラウザ側に許可される必要があるため、拒否される場合にも対応する。
-  try {
-    await canvas.requestPointerLock();
-  } catch {
-    $('menu-note').textContent = 'マウス操作を開始できませんでした。もう一度ボタンを押してください。';
-  }
-}
+// メニュー中のマウス移動は視点へ反映しない。上下角は裏返らない範囲に制限する。
+document.addEventListener('mousemove', event => {
+  if (!locked || mode !== 'playing') return;
+  const speed = .002 * sensitivity.value / 100;
+  yaw -= event.movementX * speed;
+  pitch = Math.max(-Math.PI / 2 + .01, Math.min(Math.PI / 2 - .01, pitch - event.movementY * speed));
+});
 
-// HTML の開始ボタンとヘルプボタンを、それぞれの動作へ結び付ける。
-$('play-button').addEventListener('click', start);
-$('help-button').addEventListener('click', () => {
-  if (locked) document.exitPointerLock();
-  else $('menu').hidden = false;
-});
-// Esc や再開ボタンで捕捉状態が変わるたび、プレイ画面と停止画面を切り替える。
-document.addEventListener('pointerlockchange', () => {
-  locked = document.pointerLockElement === canvas;
-  // 停止前に押していたキーが、再開後も押しっぱなしにならないようにする。
-  keys.clear();
-  $('menu').hidden = locked;
-  document.body.classList.toggle('playing', locked);
-  // 初回の紹介画面は、プレイ開始後に停止したら感度設定付きの画面へ変える。
-  if (!locked) {
-    $('menu').classList.add('is-paused');
-    $('menu-title').textContent = 'ひと休み。';
-    $('menu-description').textContent = '自分に合うマウス感度で、世界を歩こう。';
-    $('sensitivity-settings').hidden = false;
-    $('play-label').textContent = '草原にもどる';
-    $('menu-note').textContent = 'クリックで再開 · 変更したブロックはそのままです';
-    $('target-label').hidden = true;
-    // キーボードだけでも、すぐに矢印キーで感度を変えられるようにする。
-    $('mouse-sensitivity').focus({ preventScroll: true });
-  }
-});
-// マウスの捕捉が拒否された場合、画面内の案内を更新する。
-document.addEventListener('pointerlockerror', () => {
-  $('menu-note').textContent = 'マウスの捕捉が許可されていません。PCのブラウザで直接開いてください。';
-});
-// 捕捉中のマウス移動量を、視点角度の変化に換算する。
-document.addEventListener('mousemove', (event) => {
-  if (!locked) return;
-  // 100% なら元の速度。50% は半分、200% は 2 倍になる。
-  const lookSpeed = .002 * sensitivity.value / 100;
-  yaw -= event.movementX * lookSpeed;
-  // 上下の向きは真上・真下の手前までに制限し、視点の裏返りを防ぐ。
-  pitch = Math.max(-Math.PI / 2 + .01, Math.min(Math.PI / 2 - .01, pitch - event.movementY * lookSpeed));
-});
-// キーを押したとき、移動状態を記録し、単発の操作も処理する。
-document.addEventListener('keydown', (event) => {
-  if (!locked) return;
-  // Esc はマウスを解放する。停止画面の表示は pointerlockchange に任せる。
+document.addEventListener('keydown', event => {
+  // キー設定の入力待ちが最優先。Esc もこの間だけは変更の取消に使う。
+  if (keybindPanel.handleKeydown(event)) return;
   if (event.code === 'Escape') {
-    document.exitPointerLock();
+    if (mode === 'playing' || mode === 'inventory') unlockTo('pause');
     return;
   }
-  // Space や矢印キーで、ブラウザのページがスクロールするのを防ぐ。
-  if (['Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code)) event.preventDefault();
+  // インベントリのキーは変更後の設定を読む。長押しで開閉が繰り返されないようにする。
+  if (event.code === bindings.get('inventory') && (mode === 'playing' || mode === 'inventory')) {
+    event.preventDefault();
+    if (event.repeat) return;
+    if (mode === 'playing') unlockTo('inventory');
+    else start();
+    return;
+  }
+  if (!locked || mode !== 'playing') return;
+  if (Object.values(bindings.bindings).includes(event.code)) event.preventDefault();
   keys.add(event.code);
-  // 数字キーはパレットの切り替え、R は安全な開始地点への復帰。
-  if (/^Digit[1-6]$/.test(event.code)) selectBlock(Number(event.code.slice(-1)) - 1);
-  if (event.code === 'KeyR' && !event.repeat) { player.reset(); notify('はじまりの場所にもどりました'); }
+  // 単発の操作は繰り返し入力を無視し、移動の押下状態だけは維持する。
+  if (event.repeat) return;
+  for (let index = 0; index < inventory.slots.length; index++) {
+    if (event.code === bindings.get(`slot${index + 1}`)) selectBlock(index);
+  }
+  if (event.code === bindings.get('respawn')) { player.reset(); notify('はじまりの場所にもどりました'); }
 });
-// キーを離したら記録から消す。タブを離れた場合も押下状態を解除する。
-document.addEventListener('keyup', (event) => keys.delete(event.code));
+document.addEventListener('keyup', event => keys.delete(event.code));
 window.addEventListener('blur', () => {
   keys.clear();
-  if (locked) document.exitPointerLock();
+  if (locked) unlockTo('pause');
 });
-// タブ復帰直後に、大きな経過時間で急に移動してしまわないよう時刻を取り直す。
-document.addEventListener('visibilitychange', () => { keys.clear(); previousTime = performance.now(); });
-// 右クリックを設置に使うため、ゲーム画面ではブラウザのメニューを出さない。
-canvas.addEventListener('contextmenu', (event) => event.preventDefault());
-// プレイ中の左・右クリックだけをブロック編集として扱う。
-canvas.addEventListener('mousedown', (event) => {
-  if (locked && (event.button === 0 || event.button === 2)) {
-    event.preventDefault();
-    editBlock(event.button);
+// 非表示時間をFPSに混ぜず、復帰後に瞬間移動することも防ぐ。
+document.addEventListener('visibilitychange', () => {
+  keys.clear(); previousTime = performance.now(); fpsCounter.reset(); $('fps-value').textContent = '-- FPS';
+});
+canvas.addEventListener('contextmenu', event => event.preventDefault());
+canvas.addEventListener('mousedown', event => {
+  if (locked && mode === 'playing' && (event.button === 0 || event.button === 2)) {
+    event.preventDefault(); editBlock(event.button);
   }
 });
-// ホイールの回転方向に応じて、選択ブロックを一つずつ送る。
-window.addEventListener('wheel', (event) => {
-  if (!locked || !event.deltaY) return;
-  event.preventDefault();
-  selectBlock(selected + Math.sign(event.deltaY));
-// passive: false にすると、上の preventDefault でページのスクロールを止められる。
+window.addEventListener('wheel', event => {
+  if (!locked || mode !== 'playing' || !event.deltaY) return;
+  event.preventDefault(); selectBlock(inventory.selected + Math.sign(event.deltaY));
 }, { passive: false });
-// ウィンドウの大きさが変わったら、描画サイズとカメラの縦横比を合わせる。
 window.addEventListener('resize', () => view?.resize());
 
-// ブラウザの描画タイミングごとに呼ばれる、ゲームの繰り返し処理。
+// 実際の描画時刻でFPSを測り、物理計算には上限付きの経過時間を渡す。
 function frame(time) {
-  // ミリ秒を秒に換算する。重いフレームでも一度に進める時間は最大 0.05 秒。
+  const sampledFps = fpsCounter.update(time);
+  if (sampledFps !== null) $('fps-value').textContent = `${sampledFps} FPS`;
   const dt = Math.min((time - previousTime) / 1000 || 0, .05);
   previousTime = time;
-  // マウスが捕捉されていない間は、移動や重力の更新を止める。
-  if (locked) {
-    // 前後・左右は -1〜1 にまとめ、物理演算側へ渡す。
-    const input = {
-      forward: Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown')),
-      right: Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft')),
-      jump: keys.has('Space'),
-      sprint: keys.has('ShiftLeft') || keys.has('ShiftRight'),
-    };
-    // 移動・重力・当たり判定を進めたあと、新しい位置から照準を調べる。
-    player.step(dt, input, yaw);
+  if (locked && mode === 'playing') {
+    const pressed = action => bindings.isPressed(action, keys);
+    player.step(dt, {
+      forward: Number(pressed('forward')) - Number(pressed('backward')),
+      right: Number(pressed('right')) - Number(pressed('left')),
+      jump: pressed('jump'), sprint: pressed('sprint'),
+    }, yaw);
     refreshTarget();
   }
-  // 画面の座標表示と 3D 描画は、停止中も更新できるようにしておく。
   const p = player.position;
   $('coordinates').textContent = `X ${p.x.toFixed(1)} · Y ${p.y.toFixed(1)} · Z ${p.z.toFixed(1)}`;
-  view.render(p, yaw, pitch, locked ? target : null);
-  // 次の描画タイミングにも同じ関数を呼んでもらい、ループを続ける。
+  view.render(p, yaw, pitch, locked && mode === 'playing' ? target : null);
   requestAnimationFrame(frame);
 }
 
-// 初期化は一か所で行い、WebGL の作成などに失敗したら案内画面へ切り替える。
+// 地形と描画を準備し、初めてボタンとゲームループを有効にする。
 try {
   view = new WorldView(canvas);
   world = createWorld({ trees: true });
   player = new PlayerPhysics(world);
   view.rebuild(world);
-  // ブロックの種類ごとに、番号・アイコン付きの選択ボタンを作る。
-  BLOCK_TYPES.forEach((type, index) => {
-    const button = document.createElement('button');
-    button.className = 'slot';
-    button.dataset.type = type;
-    button.title = `${index + 1} · ${NAMES[type]}`;
-    button.setAttribute('aria-label', `${index + 1}: ${NAMES[type]}`);
-    const number = document.createElement('span');
-    number.textContent = index + 1;
-    const image = document.createElement('img');
-    image.src = view.blockIcon(type);
-    image.alt = '';
-    button.append(number, image);
-    button.addEventListener('click', () => selectBlock(index));
-    $('hotbar').append(button);
-  });
-  // 最初は草ブロックを選び、準備完了後に開始ボタンを有効化する。
-  selectBlock(0);
+  buildInventoryUI();
   ready = true;
+  refreshBindingHints();
   $('play-button').disabled = false;
   $('play-label').textContent = '世界に入る';
   requestAnimationFrame(frame);
 } catch (error) {
-  // 詳細は開発者コンソールへ、利用者には画面内で起動方法を案内する。
   console.error(error);
-  $('fatal-message').textContent = 'WebGL を使えるPCのブラウザで開いてください。ブラウザのハードウェアアクセラレーション設定も確認してください。';
+  $('fatal-message').textContent = 'WebGLを使えるPCのブラウザで開いてください。ハードウェアアクセラレーション設定も確認してください。';
   $('fatal-error').hidden = false;
 }
 
-// URL に ?test=1 がある場合だけ、ブラウザテストが状態を読める関数を用意する。
-// 地形の書き換え機能は公開せず、実際のキー・マウス操作で検証する。
+// テスト時だけ、入力で変化した状態を読み取れるようにする。書き換え用のAPIは公開しない。
 if (new URLSearchParams(location.search).has('test')) {
   window.__FIELDCRAFT_TEST__ = () => ({
-    ready, locked, position: player ? { ...player.position } : null,
+    ready, locked, mode, position: player ? { ...player.position } : null,
     grounded: player?.grounded ?? false, yaw, pitch, sensitivity: sensitivity.value,
-    selectedType: BLOCK_TYPES[selected], target: target ? { ...target, normal: { ...target.normal } } : null,
+    bindings: bindings.bindings, fps: fpsCounter.fps, selected: inventory.selected,
+    inventorySlots: inventory.slots, selectedType: inventory.selectedType,
+    target: target ? { ...target, normal: { ...target.normal } } : null,
     blockCount: world?.blocks.size ?? 0,
     renderCalls: view?.renderer.info.render.calls ?? 0,
     triangles: view?.renderer.info.render.triangles ?? 0,

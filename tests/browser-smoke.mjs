@@ -1,6 +1,6 @@
 /**
  * 実際の Chromium を操作して、ゲーム全体の動きを確認するテスト。
- * キーボード入力・マウス捕捉・視点移動・ブロック編集・感度設定を通して検証する。
+ * 入力・マウス捕捉・ブロック編集・設定・インベントリを通して検証する。
  * エラー発生時は終了コードを失敗にし、調査用の画面画像と状態を残す。
  */
 import assert from 'node:assert/strict';
@@ -70,13 +70,18 @@ const moveMouse = async (dx, dy) => {
   await page.mouse.move(mouse.x, mouse.y);
 };
 // 開始・再開ボタンを実際にクリックし、マウスがゲームに捕捉された状態まで待つ。
-const startOrResume = async () => {
-  const bounds = await page.locator('#play-button').boundingBox();
+const clickAndLock = async (selector) => {
+  const bounds = await page.locator(selector).boundingBox();
   assert.ok(bounds, 'The start/resume button must be visible');
   mouse = { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 };
   await page.mouse.click(mouse.x, mouse.y);
   await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().locked);
 };
+const startOrResume = () => clickAndLock('#play-button');
+// 固定秒数ではなく、実際に二つの描画フレームが進むまで待つ。
+const waitFrames = () => page.evaluate(() => new Promise((resolve) => {
+  requestAnimationFrame(() => requestAnimationFrame(resolve));
+}));
 // Esc を押し、マウスが解放されて一時停止メニューが操作できる状態まで待つ。
 const pause = async () => {
   await page.keyboard.press('Escape');
@@ -107,7 +112,10 @@ try {
   // HTML を取得した後はオフラインにし、単体版が追加ファイルを要求しないことを確かめる。
   if (standalone) await page.context().setOffline(true);
   await page.waitForFunction(() => window.__FIELDCRAFT_TEST__?.().ready);
-  await page.evaluate(() => localStorage.removeItem('fieldcraft.mouseSensitivity'));
+  await page.evaluate(() => {
+    localStorage.removeItem('fieldcraft.mouseSensitivity');
+    localStorage.removeItem('fieldcraft.keybindings');
+  });
   assert.ok(await page.locator('#play-button').isEnabled(), 'Start button must be enabled');
   const initial = await snapshot();
   assert.equal(initial.sensitivity, 100, 'A fresh browser starts at 100% sensitivity');
@@ -123,6 +131,16 @@ try {
   await moveMouse(70, 0);
   await page.waitForFunction((yaw) => Math.abs(window.__FIELDCRAFT_TEST__().yaw - yaw) > 0.01, beforeLook.yaw);
   console.log('PASS: start captures the pointer, mouse changes the viewing direction');
+
+  // FPSの標本が揃うまで待ち、正の数値が右上に表示されることを確認する。
+  await page.waitForFunction(() => {
+    const fps = window.__FIELDCRAFT_TEST__().fps;
+    return Number.isFinite(fps) && fps > 0;
+  });
+  const fpsBounds = await page.locator('#fps-value').boundingBox();
+  assert.ok(fpsBounds && fpsBounds.x > 1440 * 0.6 && fpsBounds.y < 150, 'FPS must be displayed at the top right');
+  assert.match(await page.locator('#fps-value').textContent(), /\d/);
+  console.log('PASS: sampled FPS is positive and displayed at the top right');
 
   // 移動：四方向へそれぞれ入力し、地面の高さを保ったまま移動できることを確かめる。
   for (const key of ['w', 's', 'a', 'd']) {
@@ -233,6 +251,137 @@ try {
   await startOrResume();
   console.log('PASS: reset restores 100%; saved 150% persists across a reload; test leaves the default 100%');
 
+  // Tabで持ち物を開く。表示中は移動・ワールド編集が停止することも確かめる。
+  await page.keyboard.press('Tab');
+  await page.waitForFunction(() => {
+    const state = window.__FIELDCRAFT_TEST__();
+    return state.mode === 'inventory' && !state.locked;
+  });
+  const inventoryState = await snapshot();
+  await page.keyboard.down('w');
+  try { await waitFrames(); } finally { await page.keyboard.up('w'); }
+  await page.mouse.click(10, 450, { button: 'left' });
+  await page.mouse.click(10, 450, { button: 'right' });
+  await waitFrames();
+  const stillInventory = await snapshot();
+  assert.ok(horizontalDistance(inventoryState.position, stillInventory.position) < 0.01, 'Inventory must freeze movement');
+  assert.equal(stillInventory.blockCount, inventoryState.blockCount, 'Inventory must prevent world edits');
+  await page.locator('#inventory-hotbar button[data-slot="0"]').click();
+  await page.locator('#inventory-grid button[data-type="stone"]').click();
+  await page.waitForFunction(() => {
+    const state = window.__FIELDCRAFT_TEST__();
+    return state.selected === 0 && state.inventorySlots[0] === 'stone' && state.selectedType === 'stone';
+  });
+  await page.screenshot({ path: new URL('inventory.png', artifacts).pathname });
+  await clickAndLock('#inventory-resume');
+  assert.equal((await snapshot()).selectedType, 'stone', 'Assigned blocks must stay selected after closing inventory');
+
+  // 持ち物で割り当てた石が、実際の右クリック設置にも使われることを確認する。
+  for (let step = 0; step < 20; step++) {
+    const state = await snapshot();
+    if (state.target?.y === -1 && state.target.normal.y === 1 && state.pitch <= -0.6 && state.pitch > -1.1) break;
+    await moveMouse(0, 25);
+    await waitFrames();
+  }
+  const inventoryEditCount = (await snapshot()).blockCount;
+  await page.mouse.click(mouse.x, mouse.y, { button: 'left' });
+  await page.waitForFunction((count) => window.__FIELDCRAFT_TEST__().blockCount === count - 1, inventoryEditCount);
+  await page.mouse.click(mouse.x, mouse.y, { button: 'right' });
+  await page.waitForFunction((count) => {
+    const state = window.__FIELDCRAFT_TEST__();
+    return state.blockCount === count && state.target?.type === 'stone';
+  }, inventoryEditCount);
+  await page.keyboard.press('Tab');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().mode === 'inventory');
+  await page.keyboard.press('Tab');
+  await page.waitForFunction(() => {
+    const state = window.__FIELDCRAFT_TEST__();
+    return state.mode === 'playing' && state.locked;
+  });
+  await page.keyboard.press('Tab');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().mode === 'inventory');
+  await pause();
+  assert.equal((await snapshot()).mode, 'pause', 'Esc from inventory must open the pause menu');
+  console.log('PASS: Tab inventory freezes the world, assigns hotbar blocks, places stone, and resumes with pointer lock');
+
+  // キー設定を実際の入力で変更し、重複の拒否とEscでの取消を確認する。
+  await page.locator('#keys-tab').click();
+  const bindButton = (action) => page.locator(`.keybind-button[data-action="${action}"]`);
+  await bindButton('forward').click();
+  await page.keyboard.press('z');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().bindings.forward === 'KeyZ');
+  await bindButton('backward').click();
+  await page.keyboard.press('z');
+  assert.equal((await snapshot()).bindings.backward, 'KeyS', 'Duplicate keys must not replace an existing binding');
+  assert.ok((await page.locator('#keybind-note').textContent()).trim(), 'Duplicate rejection must explain the conflict');
+  // 重複後も入力待ちが続き、再クリックせずに別のキーを登録できる。
+  await page.keyboard.press('x');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().bindings.backward === 'KeyX');
+  await bindButton('backward').click();
+  await page.keyboard.press('Escape');
+  assert.equal((await snapshot()).bindings.backward, 'KeyX', 'Esc must cancel capture without changing the binding');
+  assert.equal((await snapshot()).mode, 'pause', 'Capture cancellation must keep the pause menu open');
+  await bindButton('backward').click();
+  await page.keyboard.press('s');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().bindings.backward === 'KeyS');
+  await bindButton('inventory').click();
+  await page.keyboard.press('e');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().bindings.inventory === 'KeyE');
+  await page.screenshot({ path: new URL('keybindings.png', artifacts).pathname });
+  await startOrResume();
+
+  // 新しいZは動作し、以前のWとTabが元の操作を実行しないことを確かめる。
+  const remappedPosition = (await snapshot()).position;
+  await page.keyboard.down('w');
+  try { await waitFrames(); } finally { await page.keyboard.up('w'); }
+  assert.ok(horizontalDistance(remappedPosition, (await snapshot()).position) < 0.01, 'The old forward key must stop moving the player');
+  await page.keyboard.down('z');
+  try {
+    await page.waitForFunction((origin) => {
+      const position = window.__FIELDCRAFT_TEST__().position;
+      return Math.hypot(position.x - origin.x, position.z - origin.z) > 0.25;
+    }, remappedPosition);
+  } finally { await page.keyboard.up('z'); }
+  await page.keyboard.press('Tab');
+  await waitFrames();
+  assert.equal((await snapshot()).mode, 'playing', 'The old inventory key must stop opening inventory');
+  await page.keyboard.press('e');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().mode === 'inventory');
+  await page.keyboard.press('e');
+  await page.waitForFunction(() => {
+    const state = window.__FIELDCRAFT_TEST__();
+    return state.mode === 'playing' && state.locked;
+  });
+  await pause();
+  const savedBindings = JSON.parse(await page.evaluate(() => localStorage.getItem('fieldcraft.keybindings')));
+  assert.equal(savedBindings.forward, 'KeyZ');
+  assert.equal(savedBindings.inventory, 'KeyE');
+  console.log('PASS: capture rejects duplicates, Esc cancels capture, remapped Z moves, and E toggles inventory');
+
+  // 再起動しても設定が残り、最後に標準設定へ戻せることを確認する。
+  if (standalone) await page.context().setOffline(false);
+  await page.reload({ waitUntil: 'networkidle' });
+  documentLoads++;
+  if (standalone) await page.context().setOffline(true);
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__?.().ready);
+  assert.equal((await snapshot()).bindings.forward, 'KeyZ', 'Forward binding must survive reload');
+  assert.equal((await snapshot()).bindings.inventory, 'KeyE', 'Inventory binding must survive reload');
+  await startOrResume();
+  await page.keyboard.press('e');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().mode === 'inventory');
+  await pause();
+  await page.locator('#keys-tab').click();
+  await page.locator('#keybind-reset').click();
+  await page.waitForFunction(() => {
+    const bindings = window.__FIELDCRAFT_TEST__().bindings;
+    return bindings.forward === 'KeyW' && bindings.backward === 'KeyS' && bindings.inventory === 'Tab';
+  });
+  const resetBindings = JSON.parse(await page.evaluate(() => localStorage.getItem('fieldcraft.keybindings')));
+  assert.equal(resetBindings.forward, 'KeyW');
+  assert.equal(resetBindings.inventory, 'Tab');
+  await startOrResume();
+  console.log('PASS: keybindings persist, work after reload, and reset to defaults');
+
   // 画面サイズ変更：描画領域の大きさが更新され、小さな画面でも設定と再開ボタンが収まることを確かめる。
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.waitForFunction(() => {
@@ -245,6 +394,7 @@ try {
   assert.equal(dimensions.width, 1024);
   assert.equal(dimensions.height, 768);
   await pause();
+  await page.locator('#mouse-tab').click();
   await page.setViewportSize({ width: 800, height: 600 });
   await page.waitForFunction(() => window.innerWidth === 800 && window.innerHeight === 600);
   for (const id of ['mouse-sensitivity', 'play-button']) {
@@ -253,10 +403,42 @@ try {
       `${id} must remain visible within an 800×600 window`);
   }
   await page.screenshot({ path: new URL('sensitivity-compact.png', artifacts).pathname });
+  // キー設定でも、再開と標準復帰の操作が狭い画面に収まることを確認する。
+  await page.locator('#keys-tab').click();
+  for (const id of ['play-button', 'keybind-reset']) {
+    const bounds = await page.locator(`#${id}`).boundingBox();
+    assert.ok(bounds && bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 800 && bounds.y + bounds.height <= 600,
+      `${id} must remain within the compact key settings window`);
+    const hittable = await page.locator(`#${id}`).evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+      return element === hit || element.contains(hit);
+    });
+    assert.ok(hittable, `${id} must not be clipped by the compact settings card`);
+  }
+  await page.screenshot({ path: new URL('keybindings-compact.png', artifacts).pathname });
   await startOrResume();
+  // インベントリのカードと再開ボタンも同じ高さで確認する。
+  await page.keyboard.press('Tab');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().mode === 'inventory');
+  for (const id of ['inventory-grid', 'inventory-close', 'inventory-resume']) {
+    const bounds = await page.locator(`#${id}`).boundingBox();
+    assert.ok(bounds && bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 800 && bounds.y + bounds.height <= 600,
+      `${id} must remain within the compact inventory window`);
+    if (id !== 'inventory-grid') {
+      const hittable = await page.locator(`#${id}`).evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+        return element === hit || element.contains(hit);
+      });
+      assert.ok(hittable, `${id} must not be clipped by the compact inventory card`);
+    }
+  }
+  await page.screenshot({ path: new URL('inventory-compact.png', artifacts).pathname });
+  await clickAndLock('#inventory-resume');
   // 全操作を終えてからまとめて確認し、途中で発生したブラウザエラーも見逃さない。
   assert.deepEqual(errors, [], 'The browser must not report JavaScript or WebGL errors');
-  console.log('PASS: viewport resize works; slider and resume fit an 800×600 window; no browser errors');
+  console.log('PASS: mouse settings, key settings, and inventory fit an 800×600 window; no browser errors');
   if (standalone) {
     // 初回と意図した再読み込み以外の通信があれば、単体 HTML の独立性が失われている。
     const expectedRequests = testURL.protocol === 'file:' ? [] : Array(documentLoads).fill(testURL.href);

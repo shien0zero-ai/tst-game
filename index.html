@@ -20,7 +20,7 @@
         <!-- SVG は拡大してもぼやけない図形。path の座標で立方体の面と線を描く。 -->
         <a class="brand" href="./" aria-label="FIELDCRAFT ホーム"><svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 1 31 9v18l-15 8L1 27V9Z" fill="#f0f2d7"/><path d="m1 9 15 8 15-8M16 17v18" fill="none" stroke="#355642" stroke-width="2"/><path d="m8 5 15 8M8 13v9l8 4" fill="none" stroke="#355642" stroke-width="2"/></svg><span>FIELDCRAFT<small>あなたの、小さな世界。</small></span></a>
         <!-- 状態の点・区切り線・昼のアイコンと、操作案内を開く「?」ボタン。 -->
-        <div class="world-status"><span class="status-dot"></span><span>草原のワールド</span><span class="divider"></span><span class="sun-icon">☀</span><span>DAY 01</span><button id="help-button" class="icon-button" title="操作方法 / 一時停止" aria-label="操作方法を開く">?</button></div>
+        <div class="world-status"><span class="status-dot"></span><span>草原のワールド</span><span class="divider"></span><span class="sun-icon">☀</span><span>DAY 01</span><span class="divider"></span><span id="fps-value" class="fps-value" title="1秒あたりの描画回数">-- FPS</span><button id="help-button" class="icon-button" title="操作方法 / 一時停止" aria-label="操作方法を開く">?</button></div>
       </header>
       <!-- 画面中央の照準。2 本の線を CSS で重ねる装飾なので読み上げ対象から外す。 -->
       <div id="crosshair" aria-hidden="true"><i></i><i></i></div>
@@ -33,8 +33,13 @@
           <div class="eyebrow"><span></span> A LITTLE WORLD. ENDLESS POSSIBILITIES.</div>
           <h1 id="menu-title">小さな世界に、<br />大きな自由を。</h1>
           <p id="menu-description" class="intro-copy">歩いて、こわして、つくって。<br />この草原を、あなただけの場所に。</p>
+          <!-- 停止中はマウス設定とキー設定を切り替える。表示の切替は main.js が担当する。 -->
+          <div id="settings-tabs" class="settings-tabs" role="tablist" aria-label="操作設定" hidden>
+            <button id="mouse-tab" class="settings-tab" type="button" role="tab" aria-controls="sensitivity-settings" aria-selected="true">マウス感度</button>
+            <button id="keys-tab" class="settings-tab" type="button" role="tab" aria-controls="keybind-settings" aria-selected="false">キー設定</button>
+          </div>
           <!-- 感度の操作欄は、プレイ中に Esc を押して停止するまで隠しておく。 -->
-          <section id="sensitivity-settings" class="sensitivity-settings" aria-labelledby="sensitivity-label" hidden>
+          <section id="sensitivity-settings" class="sensitivity-settings" role="tabpanel" aria-labelledby="mouse-tab" hidden>
             <div class="sensitivity-heading">
               <!-- for でラベルを入力欄につなげ、output に現在の値を表示する。 -->
               <label id="sensitivity-label" for="mouse-sensitivity">マウス感度</label>
@@ -47,14 +52,33 @@
             <div class="sensitivity-actions"><span>標準 100%</span><button id="sensitivity-reset" type="button">標準に戻す</button></div>
             <p id="sensitivity-note" class="sensitivity-note" role="status">変更はこのブラウザに自動保存されます</p>
           </section>
+          <!-- 操作ごとのボタンは keybind-panel.js が生成し、新しいキー入力を受け取る。 -->
+          <section id="keybind-settings" role="tabpanel" aria-labelledby="keys-tab" hidden>
+            <p class="keybind-instructions">変更するキーをクリックして、新しいキーを押してください。<br />Esc は一時停止用に固定です。キー入力待ち中は Esc で取り消せます。</p>
+            <div id="keybind-list" class="keybind-list"></div>
+            <div class="keybind-actions"><button id="keybind-reset" type="button">キーを初期設定に戻す</button></div>
+            <p id="keybind-note" class="keybind-note" role="status">変更はこのブラウザに自動保存されます</p>
+          </section>
           <!-- 準備完了まで開始を禁止する。開始後は、このボタンが再開用にもなる。 -->
           <button id="play-button" class="play-button" disabled><span id="play-label">ワールドを準備中…</span><span aria-hidden="true">↗</span></button>
           <p id="menu-note" class="menu-note">クリックでマウスを捕捉 · Esc で一時停止</p>
           <!-- kbd は「キーボードのキー」を表すタグ。CSS でキーの形に見せる。 -->
-          <div class="intro-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動</span><span><kbd>SPACE</kbd> ジャンプ</span><span><span class="mouse-glyph">◧</span> マウスで見回す</span></div>
+          <div id="intro-controls" class="intro-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動</span><span><kbd>SPACE</kbd> ジャンプ</span><span><span class="mouse-glyph">◧</span> マウスで見回す</span></div>
         </div>
         <!-- スタート画面のワールド紹介。停止画面や小さいウィンドウでは非表示。 -->
         <aside class="world-card"><span class="world-number">01 / PLAINS</span><h2>はじまりの草原</h2><p>風景は、あなたのアイデアを待っている。</p><div class="world-tags"><span>自由に建築</span><span>6種類のブロック</span><span>時間制限なし</span></div></aside>
+      </section>
+      <!-- インベントリ中はマウスを解放し、ブロック選択とホットバーの並べ替えを行う。 -->
+      <section id="inventory-menu" class="inventory-overlay" role="dialog" aria-modal="true" aria-labelledby="inventory-title" hidden>
+        <div class="inventory-dialog">
+          <div class="inventory-heading"><div><span class="world-number">CREATIVE INVENTORY</span><h2 id="inventory-title">インベントリ</h2></div><button id="inventory-close" type="button" aria-label="インベントリを閉じる">×</button></div>
+          <p class="inventory-description">ブロックは無制限。好きな素材をホットバーに入れて、自由につくろう。</p>
+          <div id="inventory-grid" class="inventory-grid" aria-label="使えるブロック"></div>
+          <div class="inventory-toolbar"><span>割り当てるスロットを選択</span><div id="inventory-hotbar" class="inventory-hotbar" role="toolbar" aria-label="インベントリ内のホットバー"></div></div>
+          <p id="inventory-note" class="inventory-note" role="status">下のスロットを選び、ブロックをクリックすると割り当てられます。</p>
+          <button id="inventory-resume" class="play-button" type="button"><span>ゲームにもどる</span><span aria-hidden="true">↗</span></button>
+          <p id="inventory-controls" class="inventory-controls">Tab で閉じる · Esc で設定へ</p>
+        </div>
       </section>
       <!-- 設置できないときなどのお知らせ。role=status で支援技術にも更新を伝える。 -->
       <div id="toast" class="toast" role="status" hidden></div>
@@ -65,7 +89,7 @@
         <!-- hotbar は空で用意し、main.js がブロックごとの選択ボタンを追加する。 -->
         <div class="inventory"><div class="inventory-label"><span>BLOCK PALETTE</span><span id="selected-name">草ブロック</span></div><div id="hotbar" class="hotbar" role="toolbar" aria-label="ブロック選択"></div></div>
         <!-- 通常サイズの画面に表示する操作の早見表。 -->
-        <div class="quick-help"><span><b>左クリック</b> 壊す <span class="help-separator">/</span> <b>右クリック</b> 置く</span><span><kbd>1</kbd> – <kbd>6</kbd> 選択 <span class="help-separator">/</span> <kbd>ESC</kbd> 休憩</span></div>
+        <div id="quick-help" class="quick-help"><span><b>左クリック</b> 壊す <span class="help-separator">/</span> <b>右クリック</b> 置く</span><span><kbd>Tab</kbd> 持ち物 <span class="help-separator">/</span> <kbd>Esc</kbd> 設定</span></div>
       </footer>
       <!-- WebGL の起動に失敗した場合だけ表示。再読み込みボタンはページを開き直す。 -->
       <div id="fatal-error" class="fatal-error" hidden role="alert"><h2>ワールドを開けませんでした</h2><p id="fatal-message"></p><button onclick="location.reload()">再読み込み</button></div>

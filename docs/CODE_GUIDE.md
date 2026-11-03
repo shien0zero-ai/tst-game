@@ -12,7 +12,11 @@
 | 4 | `src/physics.js` | 移動、ジャンプ、床・壁との衝突、安全な場所への復帰 |
 | 5 | `src/render.js` | Three.js での描画、ブロックの模様、見える面の組み立て |
 | 6 | `src/settings.js` | マウス感度の制限とブラウザへの保存 |
+| 6a | `src/keybindings.js`、`src/keybind-panel.js` | キーの検証・保存・変更入力を待つ画面 |
+| 6b | `src/inventory.js` | ホットバーの選択と、使う素材の割り当て |
+| 6c | `src/fps.js` | 描画時刻を使った FPS の集計 |
 | 7 | `src/style.css`、`src/settings.css` | 各画面の見た目、小さいウィンドウへの対応 |
+| 7a | `src/game-ui.css` | FPS・インベントリ・キー設定画面の表示 |
 | 8 | `tests/` 内のファイル | 何を操作し、どんな結果なら正しいと判断するか |
 | 9 | `scripts/export-standalone.mjs` | ゲームを 1 個の HTML ファイルにまとめる仕組み |
 
