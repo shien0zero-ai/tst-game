@@ -20,7 +20,17 @@
         <div class="intro-card">
           <div class="eyebrow"><span></span> A LITTLE WORLD. ENDLESS POSSIBILITIES.</div>
           <h1 id="menu-title">小さな世界に、<br />大きな自由を。</h1>
-          <p class="intro-copy">歩いて、こわして、つくって。<br />この草原を、あなただけの場所に。</p>
+          <p id="menu-description" class="intro-copy">歩いて、こわして、つくって。<br />この草原を、あなただけの場所に。</p>
+          <section id="sensitivity-settings" class="sensitivity-settings" aria-labelledby="sensitivity-label" hidden>
+            <div class="sensitivity-heading">
+              <label id="sensitivity-label" for="mouse-sensitivity">マウス感度</label>
+              <output id="sensitivity-value" for="mouse-sensitivity">100%</output>
+            </div>
+            <input id="mouse-sensitivity" type="range" min="10" max="300" step="5" value="100" aria-describedby="sensitivity-note" />
+            <div class="sensitivity-scale"><span>ゆっくり</span><span>すばやく</span></div>
+            <div class="sensitivity-actions"><span>標準 100%</span><button id="sensitivity-reset" type="button">標準に戻す</button></div>
+            <p id="sensitivity-note" class="sensitivity-note" role="status">変更はこのブラウザに自動保存されます</p>
+          </section>
           <button id="play-button" class="play-button" disabled><span id="play-label">ワールドを準備中…</span><span aria-hidden="true">↗</span></button>
           <p id="menu-note" class="menu-note">クリックでマウスを捕捉 · Esc で一時停止</p>
           <div class="intro-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動</span><span><kbd>SPACE</kbd> ジャンプ</span><span><span class="mouse-glyph">◧</span> マウスで見回す</span></div>

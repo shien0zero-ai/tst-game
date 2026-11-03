@@ -1,18 +1,43 @@
 import './style.css';
+import './settings.css';
 import * as THREE from 'three';
 import { createWorld, raycastVoxel, BLOCK_TYPES } from './world.js';
 import { PlayerPhysics, EYE_HEIGHT } from './physics.js';
 import { WorldView } from './render.js';
+import { createSensitivitySettings } from './settings.js';
 
 const NAMES = { grass: '草ブロック', dirt: '土', stone: '石', wood: '原木', leaves: '葉', sand: '砂' };
 const $ = (id) => document.getElementById(id);
 const canvas = $('world');
 const keys = new Set();
+const sensitivity = createSensitivitySettings();
 let view, world, player;
 let ready = false, locked = false, selected = 0, target = null;
 let yaw = -.24, pitch = -.12;
 let previousTime = 0, toastTimer;
 const direction = new THREE.Vector3();
+
+function updateSensitivityControls(result) {
+  const value = sensitivity.value;
+  const slider = $('mouse-sensitivity');
+  slider.value = value;
+  slider.setAttribute('aria-valuetext', `${value}%`);
+  slider.style.setProperty('--range-progress', `${(value - Number(slider.min)) / (Number(slider.max) - Number(slider.min)) * 100}%`);
+  $('sensitivity-value').textContent = `${value}%`;
+  if (result) {
+    $('sensitivity-note').textContent = result.saved
+      ? 'このブラウザに保存しました · 次回起動時も使えます'
+      : '今回の操作には反映済みです · ブラウザへの保存はできませんでした';
+  }
+}
+
+$('mouse-sensitivity').addEventListener('input', (event) => {
+  updateSensitivityControls(sensitivity.set(event.target.value));
+});
+$('sensitivity-reset').addEventListener('click', () => {
+  updateSensitivityControls(sensitivity.reset());
+});
+updateSensitivityControls();
 
 function notify(message) {
   clearTimeout(toastTimer);
@@ -79,9 +104,14 @@ document.addEventListener('pointerlockchange', () => {
   $('menu').hidden = locked;
   document.body.classList.toggle('playing', locked);
   if (!locked) {
+    $('menu').classList.add('is-paused');
+    $('menu-title').textContent = 'ひと休み。';
+    $('menu-description').textContent = '自分に合うマウス感度で、世界を歩こう。';
+    $('sensitivity-settings').hidden = false;
     $('play-label').textContent = '草原にもどる';
     $('menu-note').textContent = 'クリックで再開 · 変更したブロックはそのままです';
     $('target-label').hidden = true;
+    $('mouse-sensitivity').focus({ preventScroll: true });
   }
 });
 document.addEventListener('pointerlockerror', () => {
@@ -89,8 +119,9 @@ document.addEventListener('pointerlockerror', () => {
 });
 document.addEventListener('mousemove', (event) => {
   if (!locked) return;
-  yaw -= event.movementX * .002;
-  pitch = Math.max(-Math.PI / 2 + .01, Math.min(Math.PI / 2 - .01, pitch - event.movementY * .002));
+  const lookSpeed = .002 * sensitivity.value / 100;
+  yaw -= event.movementX * lookSpeed;
+  pitch = Math.max(-Math.PI / 2 + .01, Math.min(Math.PI / 2 - .01, pitch - event.movementY * lookSpeed));
 });
 document.addEventListener('keydown', (event) => {
   if (!locked) return;
@@ -177,7 +208,7 @@ try {
 if (new URLSearchParams(location.search).has('test')) {
   window.__FIELDCRAFT_TEST__ = () => ({
     ready, locked, position: player ? { ...player.position } : null,
-    grounded: player?.grounded ?? false, yaw, pitch,
+    grounded: player?.grounded ?? false, yaw, pitch, sensitivity: sensitivity.value,
     selectedType: BLOCK_TYPES[selected], target: target ? { ...target, normal: { ...target.normal } } : null,
     blockCount: world?.blocks.size ?? 0,
     renderCalls: view?.renderer.info.render.calls ?? 0,

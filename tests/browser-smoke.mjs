@@ -45,6 +45,7 @@ page.on('console', (message) => {
 const snapshot = () => page.evaluate(() => window.__FIELDCRAFT_TEST__());
 const horizontalDistance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 let mouse = { x: 0, y: 0 };
+let documentLoads = 1;
 const moveMouse = async (dx, dy) => {
   mouse = { x: mouse.x + dx, y: mouse.y + dy };
   await page.mouse.move(mouse.x, mouse.y);
@@ -56,13 +57,34 @@ const startOrResume = async () => {
   await page.mouse.click(mouse.x, mouse.y);
   await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().locked);
 };
+const pause = async () => {
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !window.__FIELDCRAFT_TEST__().locked);
+  await page.locator('#play-button').waitFor({ state: 'visible' });
+};
+const setSensitivity = async (percentage) => {
+  const range = page.locator('#mouse-sensitivity');
+  await range.focus();
+  await range.press('Home');
+  for (let value = 10; value < percentage; value += 5) await range.press('ArrowRight');
+  await page.waitForFunction((value) => window.__FIELDCRAFT_TEST__().sensitivity === value, percentage);
+  assert.equal((await page.locator('#sensitivity-value').textContent()).trim(), `${percentage}%`);
+};
+const measureMouseTurn = async () => {
+  const before = await snapshot();
+  await moveMouse(80, 0);
+  await page.waitForFunction((yaw) => Math.abs(window.__FIELDCRAFT_TEST__().yaw - yaw) > 0.01, before.yaw);
+  return Math.abs((await snapshot()).yaw - before.yaw);
+};
 
 try {
   await page.goto(testURL.href, { waitUntil: 'networkidle' });
   if (standalone) await page.context().setOffline(true);
   await page.waitForFunction(() => window.__FIELDCRAFT_TEST__?.().ready);
+  await page.evaluate(() => localStorage.removeItem('fieldcraft.mouseSensitivity'));
   assert.ok(await page.locator('#play-button').isEnabled(), 'Start button must be enabled');
   const initial = await snapshot();
+  assert.equal(initial.sensitivity, 100, 'A fresh browser starts at 100% sensitivity');
   assert.ok(initial.blockCount > 1000, 'The world must contain terrain and trees');
   assert.ok(initial.triangles > 0, 'Three.js must render world geometry');
   await page.screenshot({ path: new URL('start-screen.png', artifacts).pathname });
@@ -134,16 +156,47 @@ try {
   console.log('PASS: left click breaks a block; right click places the selected block');
 
   await page.screenshot({ path: new URL('gameplay.png', artifacts).pathname });
-  await page.keyboard.press('Escape');
-  await page.waitForFunction(() => !window.__FIELDCRAFT_TEST__().locked);
-  await page.locator('#play-button').waitFor({ state: 'visible' });
+  await pause();
   const paused = await snapshot();
   await page.keyboard.down('w');
   await page.waitForTimeout(180);
   await page.keyboard.up('w');
   assert.ok(horizontalDistance(paused.position, (await snapshot()).position) < 0.01, 'Movement must pause when the pointer is unlocked');
+
+  await setSensitivity(50);
+  await page.screenshot({ path: new URL('sensitivity-settings.png', artifacts).pathname });
   await startOrResume();
-  console.log('PASS: Esc pauses the world and the resume button captures the pointer again');
+  const lowSensitivityTurn = await measureMouseTurn();
+  assert.ok(Math.abs(lowSensitivityTurn - 0.08) < 0.015, 'At 50%, an 80px mouse movement should turn about 0.08 radians');
+  await pause();
+  await setSensitivity(200);
+  await startOrResume();
+  const highSensitivityTurn = await measureMouseTurn();
+  assert.ok(Math.abs(highSensitivityTurn - 0.32) < 0.025, 'At 200%, an 80px mouse movement should turn about 0.32 radians');
+  const turnRatio = highSensitivityTurn / lowSensitivityTurn;
+  assert.ok(turnRatio > 3.6 && turnRatio < 4.4, '200% must turn four times as far as 50% for the same mouse movement');
+  console.log('PASS: Esc pauses; keyboard slider settings apply on resume; 200% mouse turns are 4× 50% turns');
+
+  await pause();
+  await page.locator('#sensitivity-reset').click();
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().sensitivity === 100);
+  assert.equal((await page.locator('#sensitivity-value').textContent()).trim(), '100%');
+  await setSensitivity(150);
+  assert.equal(await page.evaluate(() => localStorage.getItem('fieldcraft.mouseSensitivity')), '150');
+  if (standalone) await page.context().setOffline(false);
+  await page.reload({ waitUntil: 'networkidle' });
+  documentLoads++;
+  if (standalone) await page.context().setOffline(true);
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__?.().ready);
+  assert.equal((await snapshot()).sensitivity, 150, 'The saved sensitivity must survive a page reload');
+  assert.equal((await page.locator('#sensitivity-value').textContent()).trim(), '150%');
+  await startOrResume();
+  await pause();
+  await page.locator('#sensitivity-reset').click();
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().sensitivity === 100);
+  assert.equal(await page.evaluate(() => localStorage.getItem('fieldcraft.mouseSensitivity')), '100');
+  await startOrResume();
+  console.log('PASS: reset restores 100%; saved 150% persists across a reload; test leaves the default 100%');
 
   await page.setViewportSize({ width: 1024, height: 768 });
   await page.waitForFunction(() => {
@@ -155,14 +208,24 @@ try {
   }));
   assert.equal(dimensions.width, 1024);
   assert.equal(dimensions.height, 768);
+  await pause();
+  await page.setViewportSize({ width: 800, height: 600 });
+  await page.waitForFunction(() => window.innerWidth === 800 && window.innerHeight === 600);
+  for (const id of ['mouse-sensitivity', 'play-button']) {
+    const bounds = await page.locator(`#${id}`).boundingBox();
+    assert.ok(bounds && bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 800 && bounds.y + bounds.height <= 600,
+      `${id} must remain visible within an 800×600 window`);
+  }
+  await page.screenshot({ path: new URL('sensitivity-compact.png', artifacts).pathname });
+  await startOrResume();
   assert.deepEqual(errors, [], 'The browser must not report JavaScript or WebGL errors');
-  console.log('PASS: viewport resize works; no browser errors');
+  console.log('PASS: viewport resize works; slider and resume fit an 800×600 window; no browser errors');
   if (standalone) {
-    const expectedRequests = testURL.protocol === 'file:' ? [] : [testURL.href];
-    assert.deepEqual(networkRequests, expectedRequests, 'Standalone HTML must only fetch its initial document');
+    const expectedRequests = testURL.protocol === 'file:' ? [] : Array(documentLoads).fill(testURL.href);
+    assert.deepEqual(networkRequests, expectedRequests, 'Standalone HTML must only fetch its document, including the deliberate persistence-test reload');
     console.log('PASS: standalone HTML runs offline after opening; zero external or subresource requests');
   }
-  console.log('Browser smoke checks passed. Screenshots: artifacts/start-screen.png, artifacts/gameplay.png');
+  console.log('Browser smoke checks passed. Screenshots: artifacts/start-screen.png, artifacts/gameplay.png, artifacts/sensitivity-settings.png, artifacts/sensitivity-compact.png');
 } catch (error) {
   await page.screenshot({ path: new URL('failure.png', artifacts).pathname }).catch(() => {});
   const state = await snapshot().catch(() => null);
