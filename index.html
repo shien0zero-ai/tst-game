@@ -1,50 +1,76 @@
 <!doctype html>
+<!-- ゲーム画面の骨組み。実際の移動・描画・設定変更は src/main.js が担当する。 -->
 <html lang="ja">
   <head>
+    <!-- 日本語を正しく表示し、画面幅に合わせてレイアウトを調整するための設定。 -->
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 対応ブラウザの周辺色、タブのタイトル、タブに表示するアイコン。 -->
     <meta name="theme-color" content="#243d32" />
     <title>FIELDCRAFT — あなたの、小さな世界。</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   </head>
   <body>
+    <!-- 全画面のゲーム領域。各 id は JavaScript が要素を見つける目印になる。 -->
     <main id="game" aria-label="一人称ブロックサンドボックスゲーム">
+      <!-- Three.js が草原や木を描くキャンバス。ボタンなどの UI はその上に重ねる。 -->
       <canvas id="world" aria-label="草原の3Dワールド"></canvas>
+      <!-- 上部の固定表示。左は立方体のロゴ、右はワールド名とヘルプボタン。 -->
       <header class="topbar">
+        <!-- SVG は拡大してもぼやけない図形。path の座標で立方体の面と線を描く。 -->
         <a class="brand" href="./" aria-label="FIELDCRAFT ホーム"><svg viewBox="0 0 32 36" aria-hidden="true"><path d="M16 1 31 9v18l-15 8L1 27V9Z" fill="#f0f2d7"/><path d="m1 9 15 8 15-8M16 17v18" fill="none" stroke="#355642" stroke-width="2"/><path d="m8 5 15 8M8 13v9l8 4" fill="none" stroke="#355642" stroke-width="2"/></svg><span>FIELDCRAFT<small>あなたの、小さな世界。</small></span></a>
+        <!-- 状態の点・区切り線・昼のアイコンと、操作案内を開く「?」ボタン。 -->
         <div class="world-status"><span class="status-dot"></span><span>草原のワールド</span><span class="divider"></span><span class="sun-icon">☀</span><span>DAY 01</span><button id="help-button" class="icon-button" title="操作方法 / 一時停止" aria-label="操作方法を開く">?</button></div>
       </header>
+      <!-- 画面中央の照準。2 本の線を CSS で重ねる装飾なので読み上げ対象から外す。 -->
       <div id="crosshair" aria-hidden="true"><i></i><i></i></div>
+      <!-- 照準がブロックに当たったときだけ、種類と距離を表示する。 -->
       <div id="target-label" class="target-label" hidden></div>
+      <!-- 最初は紹介画面。Esc で停止した後は、同じ領域を感度設定画面として使う。 -->
       <section id="menu" class="menu-overlay" aria-labelledby="menu-title">
         <div class="intro-card">
+          <!-- 紹介用の見出しと説明。停止時には JavaScript が文面を差し替える。 -->
           <div class="eyebrow"><span></span> A LITTLE WORLD. ENDLESS POSSIBILITIES.</div>
           <h1 id="menu-title">小さな世界に、<br />大きな自由を。</h1>
           <p id="menu-description" class="intro-copy">歩いて、こわして、つくって。<br />この草原を、あなただけの場所に。</p>
+          <!-- 感度の操作欄は、プレイ中に Esc を押して停止するまで隠しておく。 -->
           <section id="sensitivity-settings" class="sensitivity-settings" aria-labelledby="sensitivity-label" hidden>
             <div class="sensitivity-heading">
+              <!-- for でラベルを入力欄につなげ、output に現在の値を表示する。 -->
               <label id="sensitivity-label" for="mouse-sensitivity">マウス感度</label>
               <output id="sensitivity-value" for="mouse-sensitivity">100%</output>
             </div>
+            <!-- 感度は 10〜300%、5% 刻み。設定の範囲は src/settings.js と対応する。 -->
             <input id="mouse-sensitivity" type="range" min="10" max="300" step="5" value="100" aria-describedby="sensitivity-note" />
             <div class="sensitivity-scale"><span>ゆっくり</span><span>すばやく</span></div>
+            <!-- リセットボタンは感度を標準へ戻す。保存結果は下の案内へ表示する。 -->
             <div class="sensitivity-actions"><span>標準 100%</span><button id="sensitivity-reset" type="button">標準に戻す</button></div>
             <p id="sensitivity-note" class="sensitivity-note" role="status">変更はこのブラウザに自動保存されます</p>
           </section>
+          <!-- 準備完了まで開始を禁止する。開始後は、このボタンが再開用にもなる。 -->
           <button id="play-button" class="play-button" disabled><span id="play-label">ワールドを準備中…</span><span aria-hidden="true">↗</span></button>
           <p id="menu-note" class="menu-note">クリックでマウスを捕捉 · Esc で一時停止</p>
+          <!-- kbd は「キーボードのキー」を表すタグ。CSS でキーの形に見せる。 -->
           <div class="intro-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動</span><span><kbd>SPACE</kbd> ジャンプ</span><span><span class="mouse-glyph">◧</span> マウスで見回す</span></div>
         </div>
+        <!-- スタート画面のワールド紹介。停止画面や小さいウィンドウでは非表示。 -->
         <aside class="world-card"><span class="world-number">01 / PLAINS</span><h2>はじまりの草原</h2><p>風景は、あなたのアイデアを待っている。</p><div class="world-tags"><span>自由に建築</span><span>6種類のブロック</span><span>時間制限なし</span></div></aside>
       </section>
+      <!-- 設置できないときなどのお知らせ。role=status で支援技術にも更新を伝える。 -->
       <div id="toast" class="toast" role="status" hidden></div>
+      <!-- 下部に現在地・ブロック選択・簡単な操作説明を重ねて表示する。 -->
       <footer class="game-footer">
+        <!-- 座標の数字は main.js の描画ループが更新する。 -->
         <div class="location"><span class="location-mark">⌖</span><div><span class="location-title">PLAINS <span>—</span> 草原</span><span id="coordinates">X 0 · Y 0 · Z 0</span></div></div>
+        <!-- hotbar は空で用意し、main.js がブロックごとの選択ボタンを追加する。 -->
         <div class="inventory"><div class="inventory-label"><span>BLOCK PALETTE</span><span id="selected-name">草ブロック</span></div><div id="hotbar" class="hotbar" role="toolbar" aria-label="ブロック選択"></div></div>
+        <!-- 通常サイズの画面に表示する操作の早見表。 -->
         <div class="quick-help"><span><b>左クリック</b> 壊す <span class="help-separator">/</span> <b>右クリック</b> 置く</span><span><kbd>1</kbd> – <kbd>6</kbd> 選択 <span class="help-separator">/</span> <kbd>ESC</kbd> 休憩</span></div>
       </footer>
+      <!-- WebGL の起動に失敗した場合だけ表示。再読み込みボタンはページを開き直す。 -->
       <div id="fatal-error" class="fatal-error" hidden role="alert"><h2>ワールドを開けませんでした</h2><p id="fatal-message"></p><button onclick="location.reload()">再読み込み</button></div>
     </main>
+    <!-- module 形式で入口を読み込むと、main.js 内の import も利用できる。 -->
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>

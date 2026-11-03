@@ -1,3 +1,7 @@
+/* 【一時停止と感度設定の見た目】style.css の後に読み込み、一時停止中だけ既存メニューを設定カードに変える。
+   .is-paused は main.js が付け、スライダーの色の境界も JavaScript が更新する。 */
+
+/* 一時停止画面の重ね合わせ：設定カードを中央に置き、背景を暗くぼかす。停止中はメニューが入力を受け取る。 */
 .menu-overlay.is-paused {
   justify-content: center;
   padding: 85px 20px 110px;
@@ -6,6 +10,7 @@
   pointer-events: auto;
 }
 
+/* 一時停止の設定カード：開始画面の本文枠を設定用に使い、画面が低ければカード内をスクロールできるようにする。 */
 .is-paused .intro-card {
   width: 440px;
   max-width: 100%;
@@ -19,12 +24,14 @@
   box-shadow: 0 16px 65px #132b2840;
 }
 
+/* 一時停止では不要な案内：開始画面用の装飾・草原紹介・操作一覧を隠し、感度設定に集中できるようにする。 */
 .is-paused .eyebrow,
 .is-paused .world-card,
 .is-paused .intro-controls {
   display: none;
 }
 
+/* 一時停止の見出し：開始画面より小さい見出しにし、背景用の文字の影を外す。 */
 .is-paused .intro-card h1 {
   margin: 0 0 10px;
   font-size: 34px;
@@ -33,6 +40,7 @@
   text-shadow: none;
 }
 
+/* 一時停止の説明文：明るいカードの上で読める文字色と行間に変える。 */
 .is-paused .intro-copy {
   margin: 0 0 22px;
   color: #5c6f55;
@@ -41,6 +49,7 @@
   letter-spacing: .04em;
 }
 
+/* 感度設定のまとまり：設定部の上下に線と余白を付け、見出しや再開ボタンと区別する。 */
 .sensitivity-settings {
   margin-bottom: 24px;
   padding: 17px 0;
@@ -48,6 +57,7 @@
   border-bottom: 1px solid #63754a30;
 }
 
+/* 感度設定の横並び：名称と数値、低速と高速、標準値とリセットを、それぞれ左右に分ける。 */
 .sensitivity-heading,
 .sensitivity-scale,
 .sensitivity-actions {
@@ -57,12 +67,14 @@
   gap: 12px;
 }
 
+/* 感度設定の名称：スライダーが調整する項目の名前を少し太く表示する。 */
 .sensitivity-heading label {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: .06em;
 }
 
+/* 現在の感度の数値：百分率を大きめに表示し、桁幅をそろえて値が変わっても揺れにくくする。 */
 .sensitivity-heading output {
   color: #4f6d38;
   font-size: 18px;
@@ -70,6 +82,7 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* 感度スライダーの軌道：ブラウザ標準の見た目を置き換え、JavaScript の --range-progress で塗り分け位置を変える。 */
 #mouse-sensitivity {
   display: block;
   width: 100%;
@@ -81,6 +94,7 @@
   cursor: ew-resize;
 }
 
+/* Chrome・Edge 系のスライダーのつまみ：つまみを丸くし、白い枠と影で軌道から見分けやすくする。 */
 #mouse-sensitivity::-webkit-slider-thumb {
   width: 21px;
   height: 21px;
@@ -91,6 +105,7 @@
   appearance: none;
 }
 
+/* Firefox 用のスライダーのつまみ：ブラウザごとの疑似要素の違いに合わせ、同じ印象のつまみを設定する。 */
 #mouse-sensitivity::-moz-range-thumb {
   width: 15px;
   height: 15px;
@@ -100,22 +115,26 @@
   box-shadow: 0 1px 5px #31472555;
 }
 
+/* スライダーのキーボード選択：Tab や Esc 後のフォーカス位置が分かるよう、軌道の外に枠を付ける。 */
 #mouse-sensitivity:focus-visible {
   outline: 2px solid #65834b;
   outline-offset: 8px;
 }
 
+/* 低速・高速の目安：スライダーの両端の意味を小さな文字で案内する。 */
 .sensitivity-scale {
   color: #718164;
   font-size: 10px;
 }
 
+/* 標準値とリセットの行：スライダーの下に、標準値と戻すボタンを置く余白を作る。 */
 .sensitivity-actions {
   margin-top: 16px;
   color: #718164;
   font-size: 10px;
 }
 
+/* 標準に戻すボタン：感度を 100% に戻す小ボタンの枠・背景・余白を設定する。 */
 #sensitivity-reset {
   padding: 5px 10px;
   border: 1px solid #80906360;
@@ -125,10 +144,12 @@
   font-size: 11px;
 }
 
+/* リセットボタンの反応：マウスが重なったとき背景を明るくする。 */
 #sensitivity-reset:hover {
   background: #fffff3;
 }
 
+/* 設定の保存状態：保存成功や保存できない場合の案内を、小さな文字で表示する。 */
 .sensitivity-note {
   margin: 12px 0 0;
   color: #718164;
@@ -136,6 +157,7 @@
   line-height: 1.7;
 }
 
+/* 一時停止から再開するボタン：カードの幅に合わせ、開始ボタンを濃い背景の再開ボタンに変える。 */
 .is-paused .play-button {
   width: 100%;
   min-width: 0;
@@ -145,10 +167,12 @@
   box-shadow: none;
 }
 
+/* 再開ボタンの反応：マウスが重なったとき背景を少し濃くする。 */
 .is-paused .play-button:hover {
   background: #415b30;
 }
 
+/* 再開方法の補足：明るいカードの下部に、クリックで再開できる説明を収める。 */
 .is-paused .menu-note {
   max-width: none;
   margin: 12px 0 0;
@@ -158,14 +182,53 @@
   letter-spacing: 0;
 }
 
+/* 高さが 700px 以下の画面では、設定カード内の文字と余白を縮める。 */
 @media (max-height: 700px) {
-  .is-paused .intro-card { padding: 20px; }
-  .is-paused .intro-card h1 { font-size: 28px; margin-bottom: 6px; }
-  .is-paused .intro-copy { font-size: 11px; margin-bottom: 12px; }
-  .sensitivity-settings { padding: 12px 0; margin-bottom: 14px; }
-  #mouse-sensitivity { margin: 16px 0 12px; }
-  .sensitivity-actions { margin-top: 8px; }
-  .sensitivity-note { margin-top: 8px; }
-  .is-paused .play-button { padding: 12px 18px; }
-  .is-paused .menu-note { margin-top: 10px; }
+  /* 一時停止の設定カード：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .is-paused .intro-card {
+    padding: 20px;
+  }
+
+  /* 一時停止の見出し：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .is-paused .intro-card h1 {
+    font-size: 28px;
+    margin-bottom: 6px;
+  }
+
+  /* 一時停止の説明文：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .is-paused .intro-copy {
+    font-size: 11px;
+    margin-bottom: 12px;
+  }
+
+  /* 感度設定のまとまり：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .sensitivity-settings {
+    padding: 12px 0;
+    margin-bottom: 14px;
+  }
+
+  /* 感度スライダーの軌道：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  #mouse-sensitivity {
+    margin: 16px 0 12px;
+  }
+
+  /* 標準値とリセットの行：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .sensitivity-actions {
+    margin-top: 8px;
+  }
+
+  /* 設定の保存状態：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .sensitivity-note {
+    margin-top: 8px;
+  }
+
+  /* 一時停止から再開するボタン：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .is-paused .play-button {
+    padding: 12px 18px;
+  }
+
+  /* 再開方法の補足：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .is-paused .menu-note {
+    margin-top: 10px;
+  }
 }

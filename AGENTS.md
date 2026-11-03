@@ -25,6 +25,10 @@ its setup, and documentation in this repository when continuing development.
 ## Development workflow
 
 - Prepare the smallest playable version of a feature before adding extras.
+- Explain authored code with beginner-friendly Japanese comments: describe each
+  module, function, event handler, and nontrivial algorithm or UI section. Keep
+  comments in sync with behavior when adding features. Explain JSON settings in
+  `docs/CODE_GUIDE.md` instead of inserting invalid comments into JSON files.
 - The cloud task already has an isolated checkout. Use the existing checkout;
   do not create a Git worktree unless the user requests one.
 - Recommended toolchain: Node.js 24 LTS (version pin in `.nvmrc`), npm, Three.js,

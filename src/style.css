@@ -1,1 +1,822 @@
-:root{font-family:Inter,"Helvetica Neue",Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;color:#fffdf1;font-synthesis:none;font-weight:400;background:#91bdce;font-size:14px}*{box-sizing:border-box}body{margin:0;overflow:hidden}button,a{-webkit-tap-highlight-color:transparent}button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid #d2e995;outline-offset:5px}button:disabled{cursor:wait;opacity:.65}[hidden]{display:none!important}#game,#world{position:fixed;inset:0;width:100%;height:100%}#world{display:block;outline:none}.topbar{position:absolute;inset:30px 36px auto;display:flex;align-items:center;justify-content:space-between;gap:24px;pointer-events:none;z-index:3}.brand{display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;text-shadow:0 2px 16px #24403055;pointer-events:auto}.brand svg{width:31px;height:36px;filter:drop-shadow(0 2px 3px #183c2722)}.brand>span{font-size:22px;font-weight:750;letter-spacing:3px;line-height:1.1}.brand small{display:block;font-weight:400;letter-spacing:2px;font-size:10px;margin-top:8px}.world-status{display:flex;align-items:center;gap:10px;border:1px solid #fff9;border-radius:7px;background:#f8faeddb;box-shadow:0 3px 18px #2344270b;padding:9px 10px 9px 16px;color:#334c3d;font-size:11px;letter-spacing:1px;backdrop-filter:blur(12px)}.status-dot{width:6px;height:6px;border-radius:50%;background:#6d8d46;box-shadow:0 0 0 3px #73914f12}.divider{height:16px;width:1px;background:#354f3a24;margin:0 7px}.sun-icon{font-size:19px;color:#85733e}.icon-button{border:1px solid #62715c44;background:transparent;width:26px;height:26px;border-radius:50%;color:#43563b;margin-left:9px;font-weight:600;pointer-events:auto}.icon-button:hover{background:#dce4c4}#crosshair{position:absolute;top:50%;left:50%;width:16px;height:16px;transform:translate(-50%,-50%);opacity:.9;filter:drop-shadow(0 1px 1px #0007);pointer-events:none}#crosshair i{position:absolute;background:#fffce9;left:7px;top:1px;width:2px;height:14px}#crosshair i+i{transform:rotate(90deg)}body:not(.playing) #crosshair{opacity:0}.target-label{position:absolute;top:calc(50% + 23px);left:50%;transform:translateX(-50%);color:#fffbe6;background:#1b302b70;padding:6px 10px;border-radius:4px;font-size:10px;letter-spacing:1px;pointer-events:none;backdrop-filter:blur(5px)}.menu-overlay{position:absolute;inset:0;z-index:2;background:linear-gradient(90deg,#173b306b 0%,#193b3019 50%,transparent 80%);display:flex;align-items:center;padding:110px 7vw 155px;pointer-events:none}.intro-card{max-width:560px;pointer-events:auto}.eyebrow{display:flex;align-items:center;gap:9px;font-size:10px;letter-spacing:2.3px;font-weight:500;color:#eff0d3}.eyebrow span{height:1px;width:22px;background:#dce6ac}.intro-card h1{font-family:"Yu Mincho","Hiragino Mincho ProN",Georgia,serif;font-weight:500;font-size:clamp(36px,4.1vw,64px);line-height:1.55;letter-spacing:.12em;margin:24px 0 20px;text-shadow:0 3px 22px #183a3030}.intro-copy{font-size:13px;line-height:2.15;letter-spacing:.13em;color:#f3f3de;margin:0 0 28px}.play-button{display:flex;align-items:center;justify-content:space-between;gap:64px;border:1px solid #f2f3d7;background:#edf0d4;color:#263f31;padding:17px 23px;min-width:265px;border-radius:4px;font-size:14px;font-weight:600;letter-spacing:.11em;box-shadow:0 5px 20px #19352a22;transition:background .15s,transform .15s}.play-button span+span{font-size:23px;line-height:1;font-weight:400}.play-button:hover{background:#fffde9;transform:translateY(-2px)}.menu-note{font-size:10px;color:#e3e7d0b8;letter-spacing:.04em;margin:12px 0 28px}.intro-controls{display:flex;flex-wrap:wrap;gap:15px 20px;color:#edf0dcce;font-size:10px;border-top:1px solid #f5f7df30;padding-top:19px}.intro-controls>span{display:flex;align-items:center;gap:4px}kbd{font-family:inherit;font-size:9px;line-height:1.4;border:1px solid currentColor;border-radius:3px;padding:2px 4px;font-weight:400;opacity:.85}.mouse-glyph{font-size:17px;margin-right:4px}.world-card{position:absolute;right:38px;bottom:160px;max-width:300px;border-left:1px solid #f0f2d788;padding-left:20px;text-shadow:0 1px 8px #224d3266}.world-number{font-size:10px;letter-spacing:2px;color:#f0f2d4c9}.world-card h2{font-size:20px;letter-spacing:.15em;font-weight:500;margin:14px 0 10px}.world-card p{font-size:11px;letter-spacing:.05em;color:#eff2dfcc}.world-tags{display:flex;gap:6px;margin-top:17px}.world-tags span{font-size:9px;letter-spacing:.03em;padding:5px 8px;border:1px solid #f0f2dd4d;border-radius:3px;background:#264d3519}.game-footer{position:absolute;inset:auto 36px 24px;display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:end;z-index:3;pointer-events:none;text-shadow:0 1px 9px #1e3a3066}.location{display:flex;align-items:center;gap:10px;margin-bottom:12px;white-space:nowrap}.location-mark{font-size:29px;font-weight:300;opacity:.8}.location>div{display:flex;flex-direction:column;gap:8px}.location-title{font-size:10px;letter-spacing:2px;font-weight:500}.location-title span{opacity:.5;margin:0 3px}#coordinates{font-size:9px;letter-spacing:1px;opacity:.7;font-variant-numeric:tabular-nums}.inventory{width:max-content}.inventory-label{display:flex;justify-content:space-between;align-items:center;margin:0 3px 10px;font-size:9px;letter-spacing:1.8px;color:#f8f8e3d4}.inventory-label>span+span{letter-spacing:1px;font-size:10px}.hotbar{display:flex;gap:5px;padding:6px;border:1px solid #e9edcc70;border-radius:7px;background:#203a2de0;box-shadow:0 4px 20px #18352340;backdrop-filter:blur(15px);pointer-events:auto}.slot{position:relative;display:flex;align-items:center;justify-content:center;width:57px;height:57px;border:1px solid #f0f1cf26;border-radius:3px;background:#d8e1b708;transition:background .12s,border-color .12s,transform .12s}.slot:hover{background:#d8e1b730}.slot.selected{background:#e8edca;border:1px solid #ffffea;box-shadow:0 0 0 1px #f9ffe6;transform:translateY(-2px)}.slot>span{position:absolute;top:4px;left:5px;font-size:8px;color:#e1e9c5a6;font-variant-numeric:tabular-nums}.slot.selected>span{color:#48603c}.slot img{width:40px;height:42px;image-rendering:pixelated;filter:drop-shadow(0 3px 2px #102b2026)}.quick-help{justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:10px;font-size:9px;color:#f5f5dfc9;margin-bottom:12px;white-space:nowrap}.quick-help b{font-weight:500;color:#f5f5df}.help-separator{margin:0 7px;opacity:.4}.toast{position:absolute;left:50%;bottom:145px;transform:translateX(-50%);padding:11px 18px;background:#233c30eb;color:#f4f4dc;border:1px solid #d9e3ba50;border-radius:5px;font-size:12px;z-index:5;box-shadow:0 3px 15px #18332733;white-space:nowrap}.fatal-error{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;background:#213c32f5;z-index:10;text-align:center}.fatal-error p{max-width:600px;line-height:1.8}.fatal-error button{background:#ecf0d3;color:#233d30;border:0;border-radius:4px;padding:12px 24px}.playing .world-card{display:none}@media(max-width:1050px){.game-footer{grid-template-columns:1fr auto}.quick-help{display:none}.world-card{max-width:250px;right:30px}.menu-overlay{padding-left:5vw}.intro-controls{max-width:390px}.slot{width:51px;height:53px}}@media(max-width:700px){.topbar{inset:20px}.brand>span{font-size:16px;letter-spacing:2px}.brand small{font-size:8px}.brand svg{width:25px}.world-status{padding:7px 9px;gap:6px;font-size:9px}.world-status>.status-dot,.world-status>span:nth-child(2),.divider{display:none}.icon-button{margin-left:3px}.menu-overlay{padding:100px 26px 150px}.intro-card h1{font-size:38px;margin:18px 0}.eyebrow{font-size:8px;letter-spacing:1.3px}.world-card{display:none}.intro-controls{font-size:9px;gap:9px}.game-footer{inset:auto 12px 15px;display:flex;justify-content:center}.location{display:none}.slot{width:45px;height:49px}.slot img{width:34px;height:37px}.hotbar{gap:4px;padding:5px}.inventory-label{font-size:8px}.intro-copy{font-size:12px}.play-button{min-width:245px}.menu-note{max-width:280px;line-height:1.7}.toast{max-width:90vw;white-space:normal;text-align:center}}@media(max-height:620px){.menu-overlay{padding-top:80px;padding-bottom:120px}.intro-card h1{font-size:33px;margin:12px 0}.intro-copy{font-size:11px;line-height:1.7;margin-bottom:15px}.intro-controls{display:none}.menu-note{margin-bottom:0}.play-button{padding:12px 20px}.world-card{bottom:140px}}
+/* 【画面全体の見た目】3D の Canvas に重ねるロゴ・開始画面・照準・パレットを定義する。
+   上から基本設定、各部品、画面サイズ別の調整の順。後に書いた条件付き指定が必要な部分だけを上書きする。 */
+
+/* 画面全体の基本設定：フォント・基準文字サイズ・文字色・背景色をまとめて決める。 */
+:root {
+  font-family: Inter,"Helvetica Neue",Arial,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  color: #fffdf1;
+  font-synthesis: none;
+  font-weight: 400;
+  background: #91bdce;
+  font-size: 14px;
+}
+
+/* 全要素の寸法計算：幅と高さに余白・枠線を含め、レイアウトの寸法を予測しやすくする。 */
+* {
+  box-sizing: border-box;
+}
+
+/* ページの土台：ブラウザ既定の余白とページのスクロールをなくし、ゲームを画面内に固定する。 */
+body {
+  margin: 0;
+  overflow: hidden;
+}
+
+/* クリック時の表示：タッチ操作時のブラウザ既定の強調色を透明にする。 */
+button,a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ボタン共通：周囲の文字設定を引き継ぎ、操作できる場所をカーソルで示す。 */
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+/* キーボードのフォーカス：Tab キーなどで選んだ操作部品に、見分けやすい枠を付ける。 */
+button:focus-visible,a:focus-visible {
+  outline: 3px solid #d2e995;
+  outline-offset: 5px;
+}
+
+/* 準備中のボタン：操作できない状態を待機カーソルと薄い表示で伝える。 */
+button:disabled {
+  cursor: wait;
+  opacity: .65;
+}
+
+/* 非表示の要素：JavaScript が付け外しする hidden 属性を、他の表示指定より優先する。 */
+[hidden] {
+  display: none !important;
+}
+
+/* ゲームと描画面の大きさ：画面の四辺に固定し、Canvas と画面上の部品の基準をそろえる。 */
+#game,#world {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 3D 描画用 Canvas：余分な行間を作らず、Canvas 自体の既定の枠を表示しない。 */
+#world {
+  display: block;
+  outline: none;
+}
+
+/* 上部ヘッダー：ロゴと状態表示を左右に置く。空白部分はクリックを通し、ゲーム操作を妨げない。 */
+.topbar {
+  position: absolute;
+  inset: 30px 36px auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  pointer-events: none;
+  z-index: 3;
+}
+
+/* ロゴ全体：アイコンと作品名を横に並べる。ヘッダーの中でも、このリンクだけはクリックを受け取る。 */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  text-shadow: 0 2px 16px #24403055;
+  pointer-events: auto;
+}
+
+/* ロゴの図形：立方体アイコンの大きさと薄い影を設定する。 */
+.brand svg {
+  width: 31px;
+  height: 36px;
+  filter: drop-shadow(0 2px 3px #183c2722);
+}
+
+/* 作品名の文字：文字間を広げ、画面左上の見出しとして読めるようにする。 */
+.brand>span {
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: 3px;
+  line-height: 1.1;
+}
+
+/* ロゴ下の説明：作品名より小さい日本語の副題を、次の行に配置する。 */
+.brand small {
+  display: block;
+  font-weight: 400;
+  letter-spacing: 2px;
+  font-size: 10px;
+  margin-top: 8px;
+}
+
+/* ワールド状態の表示：草原名・日付・ヘルプを、背景が透ける一つの帯にまとめる。 */
+.world-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #fff9;
+  border-radius: 7px;
+  background: #f8faeddb;
+  box-shadow: 0 3px 18px #2344270b;
+  padding: 9px 10px 9px 16px;
+  color: #334c3d;
+  font-size: 11px;
+  letter-spacing: 1px;
+  backdrop-filter: blur(12px);
+}
+
+/* 状態を示す丸：小さな緑の点を表示し、状態表示の目印にする。 */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6d8d46;
+  box-shadow: 0 0 0 3px #73914f12;
+}
+
+/* 状態表示の区切り：ワールド名と日付の間に細い縦線を入れる。 */
+.divider {
+  height: 16px;
+  width: 1px;
+  background: #354f3a24;
+  margin: 0 7px;
+}
+
+/* 太陽の記号：昼を示す記号の大きさと色を設定する。 */
+.sun-icon {
+  font-size: 19px;
+  color: #85733e;
+}
+
+/* ヘルプボタン：丸い小ボタンにし、ヘッダー全体の設定にかかわらずクリックを受け取る。 */
+.icon-button {
+  border: 1px solid #62715c44;
+  background: transparent;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #43563b;
+  margin-left: 9px;
+  font-weight: 600;
+  pointer-events: auto;
+}
+
+/* ヘルプボタンの反応：マウスが重なったとき背景を変え、選べることを知らせる。 */
+.icon-button:hover {
+  background: #dce4c4;
+}
+
+/* 中央の照準：画面中心に固定する。操作の邪魔にならないよう、マウス入力は受け取らない。 */
+#crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  transform: translate(-50%,-50%);
+  opacity: .9;
+  filter: drop-shadow(0 1px 1px #0007);
+  pointer-events: none;
+}
+
+/* 照準の一本の線：細い縦棒を照準の中央に置く。 */
+#crosshair i {
+  position: absolute;
+  background: #fffce9;
+  left: 7px;
+  top: 1px;
+  width: 2px;
+  height: 14px;
+}
+
+/* 照準の横線：二本目の縦棒を 90 度回転させ、十字にする。 */
+#crosshair i+i {
+  transform: rotate(90deg);
+}
+
+/* 一時停止中の照準：プレイ中を示す playing クラスがない間は照準を隠す。 */
+body:not(.playing) #crosshair {
+  opacity: 0;
+}
+
+/* 狙っているブロックの名前：照準の少し下へ、ブロック名と距離を重ねて表示する。 */
+.target-label {
+  position: absolute;
+  top: calc(50% + 23px);
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fffbe6;
+  background: #1b302b70;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 10px;
+  letter-spacing: 1px;
+  pointer-events: none;
+  backdrop-filter: blur(5px);
+}
+
+/* 開始メニューの重ね合わせ：ワールドを見せながら左側を暗くする。空白部分ではマウス入力を受け取らない。 */
+.menu-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: linear-gradient(90deg,#173b306b 0%,#193b3019 50%,transparent 80%);
+  display: flex;
+  align-items: center;
+  padding: 110px 7vw 155px;
+  pointer-events: none;
+}
+
+/* 開始メニューの本文：文章の幅を制限し、メニュー内のボタン操作を有効にする。 */
+.intro-card {
+  max-width: 560px;
+  pointer-events: auto;
+}
+
+/* 見出しの前の小さな案内：短い横線と英語の案内文を横にそろえる。 */
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 10px;
+  letter-spacing: 2.3px;
+  font-weight: 500;
+  color: #eff0d3;
+}
+
+/* 案内文の横線：見出しの前に置く装飾線の長さ・太さ・色を設定する。 */
+.eyebrow span {
+  height: 1px;
+  width: 22px;
+  background: #dce6ac;
+}
+
+/* 開始画面の大見出し：画面幅に合わせて文字を拡縮し、日本語の二行見出しを配置する。 */
+.intro-card h1 {
+  font-family: "Yu Mincho","Hiragino Mincho ProN",Georgia,serif;
+  font-weight: 500;
+  font-size: clamp(36px,4.1vw,64px);
+  line-height: 1.55;
+  letter-spacing: .12em;
+  margin: 24px 0 20px;
+  text-shadow: 0 3px 22px #183a3030;
+}
+
+/* 開始画面の説明文：行間と文字間を空け、背景の上でも読めるようにする。 */
+.intro-copy {
+  font-size: 13px;
+  line-height: 2.15;
+  letter-spacing: .13em;
+  color: #f3f3de;
+  margin: 0 0 28px;
+}
+
+/* 開始・再開ボタン：文言と矢印を左右に分け、押しやすい大きさと余白を確保する。 */
+.play-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 64px;
+  border: 1px solid #f2f3d7;
+  background: #edf0d4;
+  color: #263f31;
+  padding: 17px 23px;
+  min-width: 265px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .11em;
+  box-shadow: 0 5px 20px #19352a22;
+  transition: background .15s,transform .15s;
+}
+
+/* 開始ボタンの矢印：二つ目の span にある矢印だけを大きく表示する。 */
+.play-button span+span {
+  font-size: 23px;
+  line-height: 1;
+  font-weight: 400;
+}
+
+/* 開始ボタンの反応：マウスが重なると少し明るく、少し上へ動かす。 */
+.play-button:hover {
+  background: #fffde9;
+  transform: translateY(-2px);
+}
+
+/* 開始・再開の補足：マウス捕捉や Esc キーについて、ボタンの下で案内する。 */
+.menu-note {
+  font-size: 10px;
+  color: #e3e7d0b8;
+  letter-spacing: .04em;
+  margin: 12px 0 28px;
+}
+
+/* 操作説明の一覧：キーの案内を横に並べ、幅が足りなければ折り返す。 */
+.intro-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px 20px;
+  color: #edf0dcce;
+  font-size: 10px;
+  border-top: 1px solid #f5f7df30;
+  padding-top: 19px;
+}
+
+/* 各操作説明の並び：キー表示と説明文を一組としてそろえる。 */
+.intro-controls>span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* キー名の表示：W や Space などを、小さなキーボードのキーのように囲む。 */
+kbd {
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1.4;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-weight: 400;
+  opacity: .85;
+}
+
+/* マウスの記号：操作説明にあるマウス記号の大きさと余白を調整する。 */
+.mouse-glyph {
+  font-size: 17px;
+  margin-right: 4px;
+}
+
+/* 草原の紹介カード：画面右下にワールドの紹介文を配置する。 */
+.world-card {
+  position: absolute;
+  right: 38px;
+  bottom: 160px;
+  max-width: 300px;
+  border-left: 1px solid #f0f2d788;
+  padding-left: 20px;
+  text-shadow: 0 1px 8px #224d3266;
+}
+
+/* ワールド番号：紹介カードの番号を小さな英字で示す。 */
+.world-number {
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: #f0f2d4c9;
+}
+
+/* ワールド名：紹介カードの見出しを本文より大きくする。 */
+.world-card h2 {
+  font-size: 20px;
+  letter-spacing: .15em;
+  font-weight: 500;
+  margin: 14px 0 10px;
+}
+
+/* ワールドの説明文：紹介カードの短い文章を控えめな色で表示する。 */
+.world-card p {
+  font-size: 11px;
+  letter-spacing: .05em;
+  color: #eff2dfcc;
+}
+
+/* 特徴の一覧：建築やブロック数の説明を横に並べる。 */
+.world-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 17px;
+}
+
+/* 各特徴のラベル：一つずつ枠で囲み、小さなタグに見せる。 */
+.world-tags span {
+  font-size: 9px;
+  letter-spacing: .03em;
+  padding: 5px 8px;
+  border: 1px solid #f0f2dd4d;
+  border-radius: 3px;
+  background: #264d3519;
+}
+
+/* 下部の操作情報：座標・パレット・キー案内を三列に配置する。空白部分はゲームへ入力を通す。 */
+.game-footer {
+  position: absolute;
+  inset: auto 36px 24px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 24px;
+  align-items: end;
+  z-index: 3;
+  pointer-events: none;
+  text-shadow: 0 1px 9px #1e3a3066;
+}
+
+/* 現在地の表示：目印と地形名・座標を横にまとめる。 */
+.location {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  white-space: nowrap;
+}
+
+/* 現在地の目印：座標の横の記号を少し大きく表示する。 */
+.location-mark {
+  font-size: 29px;
+  font-weight: 300;
+  opacity: .8;
+}
+
+/* 地形名と座標の並び：上下二行に並べて、一定の間隔を付ける。 */
+.location>div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* 地形名の文字：英字と日本語の地形名を小さな見出しとして表示する。 */
+.location-title {
+  font-size: 10px;
+  letter-spacing: 2px;
+  font-weight: 500;
+}
+
+/* 地形名の区切り記号：区切りだけを薄くし、左右に余白を付ける。 */
+.location-title span {
+  opacity: .5;
+  margin: 0 3px;
+}
+
+/* 座標の数字：数値の桁幅をそろえ、移動中に表示幅が揺れにくくする。 */
+#coordinates {
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: .7;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ブロックパレットの外枠：パレットの内容に合わせた幅を使う。 */
+.inventory {
+  width: max-content;
+}
+
+/* パレット上の見出し：左にパレット名、右に選択中のブロック名を置く。 */
+.inventory-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 3px 10px;
+  font-size: 9px;
+  letter-spacing: 1.8px;
+  color: #f8f8e3d4;
+}
+
+/* 選択中ブロックの名前：パレット見出しの右側だけ、文字間と大きさを調整する。 */
+.inventory-label>span+span {
+  letter-spacing: 1px;
+  font-size: 10px;
+}
+
+/* ブロック選択の帯：6 個の選択欄を並べる。下部表示の中で、この部分はクリックを受け取る。 */
+.hotbar {
+  display: flex;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid #e9edcc70;
+  border-radius: 7px;
+  background: #203a2de0;
+  box-shadow: 0 4px 20px #18352340;
+  backdrop-filter: blur(15px);
+  pointer-events: auto;
+}
+
+/* 一つのブロック選択欄：画像を中央に置き、キー番号を重ねられる基準位置を作る。 */
+.slot {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 57px;
+  height: 57px;
+  border: 1px solid #f0f1cf26;
+  border-radius: 3px;
+  background: #d8e1b708;
+  transition: background .12s,border-color .12s,transform .12s;
+}
+
+/* ブロック選択欄の反応：マウスが重なった欄の背景を明るくする。 */
+.slot:hover {
+  background: #d8e1b730;
+}
+
+/* 選択中のブロック欄：明るい背景・枠・少し上げた位置で、現在の選択を示す。 */
+.slot.selected {
+  background: #e8edca;
+  border: 1px solid #ffffea;
+  box-shadow: 0 0 0 1px #f9ffe6;
+  transform: translateY(-2px);
+}
+
+/* 選択欄のキー番号：1〜6 の番号を各欄の左上に置く。 */
+.slot>span {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  font-size: 8px;
+  color: #e1e9c5a6;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 選択中のキー番号：明るい背景でも数字を読めるよう、文字色を変える。 */
+.slot.selected>span {
+  color: #48603c;
+}
+
+/* ブロックの小画像：ドットをぼかさずに表示し、下に薄い影を付ける。 */
+.slot img {
+  width: 40px;
+  height: 42px;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 3px 2px #102b2026);
+}
+
+/* 画面右下の操作案内：マウス操作とキー操作を右寄せの二行にまとめる。 */
+.quick-help {
+  justify-self: end;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  font-size: 9px;
+  color: #f5f5dfc9;
+  margin-bottom: 12px;
+  white-space: nowrap;
+}
+
+/* 案内の操作名：クリック名などの文字だけ少し強く表示する。 */
+.quick-help b {
+  font-weight: 500;
+  color: #f5f5df;
+}
+
+/* 操作案内の区切り：説明の間の斜線を薄くし、左右に余白を付ける。 */
+.help-separator {
+  margin: 0 7px;
+  opacity: .4;
+}
+
+/* 短い通知：設置できない理由などを、パレットの上に一時表示する。 */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 145px;
+  transform: translateX(-50%);
+  padding: 11px 18px;
+  background: #233c30eb;
+  color: #f4f4dc;
+  border: 1px solid #d9e3ba50;
+  border-radius: 5px;
+  font-size: 12px;
+  z-index: 5;
+  box-shadow: 0 3px 15px #18332733;
+  white-space: nowrap;
+}
+
+/* 起動できない場合の案内：ワールドより前面を覆い、説明と再読み込みボタンを中央に置く。 */
+.fatal-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: #213c32f5;
+  z-index: 10;
+  text-align: center;
+}
+
+/* 起動エラーの説明文：文章の横幅と行間を制限して読みやすくする。 */
+.fatal-error p {
+  max-width: 600px;
+  line-height: 1.8;
+}
+
+/* 再読み込みボタン：起動をやり直すためのボタンの見た目を設定する。 */
+.fatal-error button {
+  background: #ecf0d3;
+  color: #233d30;
+  border: 0;
+  border-radius: 4px;
+  padding: 12px 24px;
+}
+
+/* プレイ中の紹介カード：ゲームを操作している間は、紹介文を隠して視界を広く使う。 */
+.playing .world-card {
+  display: none;
+}
+
+/* 幅が 1050px 以下の画面では、説明を整理してパレットの場所を確保する。 */
+@media (max-width:1050px) {
+  /* 下部の操作情報：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .game-footer {
+    grid-template-columns: 1fr auto;
+  }
+
+  /* 画面右下の操作案内：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .quick-help {
+    display: none;
+  }
+
+  /* 草原の紹介カード：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .world-card {
+    max-width: 250px;
+    right: 30px;
+  }
+
+  /* 開始メニューの重ね合わせ：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .menu-overlay {
+    padding-left: 5vw;
+  }
+
+  /* 操作説明の一覧：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .intro-controls {
+    max-width: 390px;
+  }
+
+  /* 一つのブロック選択欄：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .slot {
+    width: 51px;
+    height: 53px;
+  }
+}
+
+/* 幅が 700px 以下の画面では、文字や選択欄を縮め、補助情報を省略する。 */
+@media (max-width:700px) {
+  /* 上部ヘッダー：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .topbar {
+    inset: 20px;
+  }
+
+  /* 作品名の文字：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .brand>span {
+    font-size: 16px;
+    letter-spacing: 2px;
+  }
+
+  /* ロゴ下の説明：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .brand small {
+    font-size: 8px;
+  }
+
+  /* ロゴの図形：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .brand svg {
+    width: 25px;
+  }
+
+  /* ワールド状態の表示：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .world-status {
+    padding: 7px 9px;
+    gap: 6px;
+    font-size: 9px;
+  }
+
+  /* 小さい画面の状態表示：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .world-status>.status-dot,.world-status>span:nth-child(2),.divider {
+    display: none;
+  }
+
+  /* ヘルプボタン：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .icon-button {
+    margin-left: 3px;
+  }
+
+  /* 開始メニューの重ね合わせ：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .menu-overlay {
+    padding: 100px 26px 150px;
+  }
+
+  /* 開始画面の大見出し：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .intro-card h1 {
+    font-size: 38px;
+    margin: 18px 0;
+  }
+
+  /* 見出しの前の小さな案内：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .eyebrow {
+    font-size: 8px;
+    letter-spacing: 1.3px;
+  }
+
+  /* 草原の紹介カード：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .world-card {
+    display: none;
+  }
+
+  /* 操作説明の一覧：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .intro-controls {
+    font-size: 9px;
+    gap: 9px;
+  }
+
+  /* 下部の操作情報：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .game-footer {
+    inset: auto 12px 15px;
+    display: flex;
+    justify-content: center;
+  }
+
+  /* 現在地の表示：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .location {
+    display: none;
+  }
+
+  /* 一つのブロック選択欄：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .slot {
+    width: 45px;
+    height: 49px;
+  }
+
+  /* ブロックの小画像：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .slot img {
+    width: 34px;
+    height: 37px;
+  }
+
+  /* ブロック選択の帯：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .hotbar {
+    gap: 4px;
+    padding: 5px;
+  }
+
+  /* パレット上の見出し：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .inventory-label {
+    font-size: 8px;
+  }
+
+  /* 開始画面の説明文：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .intro-copy {
+    font-size: 12px;
+  }
+
+  /* 開始・再開ボタン：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .play-button {
+    min-width: 245px;
+  }
+
+  /* 開始・再開の補足：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .menu-note {
+    max-width: 280px;
+    line-height: 1.7;
+  }
+
+  /* 短い通知：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .toast {
+    max-width: 90vw;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+/* 高さが 620px 以下の画面では、開始メニューの縦幅を抑える。 */
+@media (max-height:620px) {
+  /* 開始メニューの重ね合わせ：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .menu-overlay {
+    padding-top: 80px;
+    padding-bottom: 120px;
+  }
+
+  /* 開始画面の大見出し：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .intro-card h1 {
+    font-size: 33px;
+    margin: 12px 0;
+  }
+
+  /* 開始画面の説明文：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .intro-copy {
+    font-size: 11px;
+    line-height: 1.7;
+    margin-bottom: 15px;
+  }
+
+  /* 操作説明の一覧：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .intro-controls {
+    display: none;
+  }
+
+  /* 開始・再開の補足：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .menu-note {
+    margin-bottom: 0;
+  }
+
+  /* 開始・再開ボタン：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .play-button {
+    padding: 12px 20px;
+  }
+
+  /* 草原の紹介カード：この画面サイズに合わせて寸法・配置・表示量を調整する。 */
+  .world-card {
+    bottom: 140px;
+  }
+}

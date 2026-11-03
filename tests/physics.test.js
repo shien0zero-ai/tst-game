@@ -1,12 +1,19 @@
+/**
+ * プレイヤーの物理処理を確認する自動テスト。
+ * 床・壁・天井との衝突、ジャンプ、落下後の復帰を小さな時間刻みで再現する。
+ * position.y は目の高さではなく足元の高さなので、草原の表面は 0 になる。
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createWorld, VoxelWorld } from '../src/world.js';
 import { PlayerPhysics, PLAYER_RADIUS } from '../src/physics.js';
 
+// 指定した秒数ぶん物理更新を繰り返す。fps を変えると、低い描画速度の状況も再現できる。
 function simulate(player, seconds, input = {}, fps = 60) {
   for (let i = 0; i < Math.ceil(seconds * fps); i++) player.step(1 / fps, input, 0);
 }
 
+// 高い位置から何も入力せず落下させ、足元が草原の表面に止まり、接地状態と落下速度が正しく更新されることを確かめる。
 test('gravity lands on the floor and never sinks through it', () => {
   const player = new PlayerPhysics(createWorld({ trees: false }), { x: 0.5, y: 8, z: 0.5 });
   simulate(player, 4);
@@ -15,6 +22,7 @@ test('gravity lands on the floor and never sinks through it', () => {
   assert.equal(player.velocity.y, 0);
 });
 
+// ジャンプの上昇と着地を確認し、Space を押し続けても連続ジャンプせず、押し直すと再び跳べることを確かめる。
 test('jump rises, lands, and holding Space does not automatically jump again', () => {
   const player = new PlayerPhysics(createWorld({ trees: false }));
   simulate(player, 0.3, { jump: true });
@@ -27,6 +35,7 @@ test('jump rises, lands, and holding Space does not automatically jump again', (
   assert.ok(player.position.y > 0.5);
 });
 
+// 目の前に壁を作り、走っても突き抜けず、斜め入力では壁に沿って横へ進めることを確かめる。
 test('solid walls stop walking and sprinting while allowing sideways sliding', () => {
   const world = createWorld({ trees: false });
   for (let x = -6; x <= 6; x++) for (let y = 0; y < 3; y++) world.set(x, y, -2, 'stone');
@@ -39,6 +48,7 @@ test('solid walls stop walking and sprinting while allowing sideways sliding', (
   assert.equal(player.position.y, 0);
 });
 
+// 足元の草ブロックだけを壊し、一段下の土の上へ落ちて止まることを確かめる。
 test('removing support lets the player fall onto the layer below', () => {
   const world = createWorld({ trees: false });
   const player = new PlayerPhysics(world, { x: 0.5, y: 0, z: 0.5 });
@@ -48,6 +58,7 @@ test('removing support lets the player fall onto the layer below', () => {
   assert.equal(player.grounded, true);
 });
 
+// 頭上に低い天井を作り、ジャンプで頭が天井を突き抜けず、その後床へ戻ることを確かめる。
 test('the player cannot jump through a low ceiling', () => {
   const world = createWorld({ trees: false });
   world.set(0, 2, 0, 'stone');
@@ -58,6 +69,7 @@ test('the player cannot jump through a low ceiling', () => {
   assert.equal(player.position.y, 0);
 });
 
+// 体と重なる設置位置は拒否し、足元の床や隣のブロックなど、面が接するだけの位置は重なりと扱わないことを確かめる。
 test('placement overlap includes the feet and head, but excludes touching surfaces', () => {
   const player = new PlayerPhysics(createWorld({ trees: false }), { x: 0.5, y: 0, z: 0.5 });
   assert.equal(player.intersectsBlock(0, 0, 0), true);
@@ -66,16 +78,19 @@ test('placement overlap includes the feet and head, but excludes touching surfac
   assert.equal(player.intersectsBlock(1, 0, 0), false);
 });
 
+// 同じ時間だけ直進と斜め移動を行い、斜め入力で移動距離が増えないことを確かめる。
 test('diagonal movement has the same speed as straight movement', () => {
   const world = createWorld({ trees: false });
   const straight = new PlayerPhysics(world, { x: 0.5, y: 0, z: 0.5 });
   const diagonal = new PlayerPhysics(world, { x: 0.5, y: 0, z: 0.5 });
   simulate(straight, 1, { forward: 1 });
   simulate(diagonal, 1, { forward: 1, right: 1 });
+  // 開始位置から横方向にどれだけ進んだかを、二つのプレイヤーで同じ方法で測る。
   const distance = player => Math.hypot(player.position.x - 0.5, player.position.z - 0.5);
   assert.ok(Math.abs(distance(straight) - distance(diagonal)) < 1e-8);
 });
 
+// プレイヤーを世界の下へ移し、次の物理更新で開始地点へ戻り、落下速度がリセットされることを確かめる。
 test('falling outside the world respawns safely', () => {
   const world = createWorld({ trees: false });
   const player = new PlayerPhysics(world);
@@ -85,6 +100,7 @@ test('falling outside the world respawns safely', () => {
   assert.equal(player.velocity.y, 0);
 });
 
+// 開始位置の地面を四層とも壊してから落下させ、地形を作り直さず近くの安全な床へ復帰できることを確かめる。
 test('respawn chooses a nearby supported column after the spawn floor is mined out', () => {
   const world = createWorld({ trees: false });
   for (let y = -4; y < 0; y++) world.remove(0, y, 7);
@@ -101,6 +117,7 @@ test('respawn chooses a nearby supported column after the spawn floor is mined o
   assert.equal(player.position.y, 0);
 });
 
+// 開始地点をブロックでふさぎ、体が埋まらず、その上の空間に復帰できることを確かめる。
 test('respawn finds headroom above blocks placed at the original spawn', () => {
   const world = createWorld({ trees: false });
   world.set(0, 0, 7, 'stone');
@@ -114,6 +131,7 @@ test('respawn finds headroom above blocks placed at the original spawn', () => {
   assert.equal(player.position.y, 2);
 });
 
+// 開始地点の草だけを壊し、削除済みの草を復活させず、残った土の上へ復帰することを確かめる。
 test('respawn can stand on remaining lower terrain without regenerating the removed grass', () => {
   const world = createWorld({ trees: false });
   world.remove(0, -1, 7);
@@ -124,6 +142,7 @@ test('respawn can stand on remaining lower terrain without regenerating the remo
   assert.equal(world.get(0, -1, 7), null);
 });
 
+// 足場が一つもない世界でも処理が止まらず、一定の位置へ戻り、ブロックを勝手に追加しないことを確かめる。
 test('respawn in an entirely empty world remains deterministic and does not mutate terrain', () => {
   const world = new VoxelWorld();
   const player = new PlayerPhysics(world);
@@ -133,6 +152,7 @@ test('respawn in an entirely empty world remains deterministic and does not muta
   assert.equal(player.grounded, false);
 });
 
+// 通常より速い落下速度を与え、一度の更新で地面を飛び越えてすり抜けないことを確かめる。
 test('a high-speed fall still collides with the top ground surface', () => {
   const player = new PlayerPhysics(createWorld({ trees: false }), { x: 0.5, y: 12, z: 0.5 });
   player.velocity.y = -500;
@@ -142,6 +162,7 @@ test('a high-speed fall still collides with the top ground surface', () => {
   assert.equal(player.collisions().length, 0);
 });
 
+// 更新間隔が長い状況でブロックの角へ斜めに走り、体が重ならず、横へ滑って通り抜けられることを確かめる。
 test('long-frame diagonal motion cannot pass through a block corner', () => {
   const world = createWorld({ trees: false });
   world.set(1, 0, -1, 'stone');

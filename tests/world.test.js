@@ -1,7 +1,13 @@
+/**
+ * ブロック世界の自動テスト。
+ * 地面・木の生成、編集できる範囲、照準が当たる位置と面を確認する。
+ * 描画用のブラウザは使わず、Node.js 上で世界のデータだけを検証する。
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { VoxelWorld, createWorld, raycastVoxel, SPAWN } from '../src/world.js';
 
+// 木を省いた草原を生成し、地面が 64×64 の四層で、開始位置の上に障害物がないことを確かめる。
 test('plains have four solid layers and a clear spawn', () => {
   const world = createWorld({ trees: false });
   assert.equal(world.blocks.size, 64 * 64 * 4);
@@ -11,6 +17,7 @@ test('plains have four solid layers and a clear spawn', () => {
   assert.equal(world.get(Math.floor(SPAWN.x), 0, Math.floor(SPAWN.z)), null);
 });
 
+// 同じ設定で生成した二つの世界を比較し、木の位置が毎回同じで、開始地点をふさがないことを確かめる。
 test('trees are deterministic and stay away from spawn', () => {
   const world = createWorld();
   assert.equal(world.get(-5, 0, -6), 'wood');
@@ -19,6 +26,7 @@ test('trees are deterministic and stay away from spawn', () => {
   assert.deepEqual([...world.blocks], [...createWorld().blocks]);
 });
 
+// 設置・削除を試し、二重設置、小数座標、世界の外、不明な種類が正しく拒否されることを確かめる。
 test('block edits reject occupied cells, invalid types, and world limits', () => {
   const world = new VoxelWorld();
   assert.equal(world.set(0, 0, 0, 'stone'), true);
@@ -32,6 +40,7 @@ test('block edits reject occupied cells, invalid types, and world limits', () =>
   assert.equal(world.get(0, 0, 0), null);
 });
 
+// 照準の先に二つのブロックを並べ、手前の位置・距離・面の向きが返り、射程外には届かないことを確かめる。
 test('ray traversal hits the nearest voxel with the correct placement face', () => {
   const world = new VoxelWorld();
   world.set(0, 0, -2, 'wood');
@@ -44,6 +53,7 @@ test('ray traversal hits the nearest voxel with the correct placement face', () 
   assert.equal(raycastVoxel(world, { x: 0.5, y: 0.5, z: 2.5 }, { x: 0, y: 0, z: -1 }, 3), null);
 });
 
+// 負の座標の地面へ下向きに照準を飛ばし、床の上面を選べることと、方向ゼロの入力が無視されることを確かめる。
 test('ray traversal handles negative coordinates and floor faces', () => {
   const world = new VoxelWorld();
   world.set(-2, -1, -1, 'grass');

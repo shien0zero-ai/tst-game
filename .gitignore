@@ -1,4 +1,8 @@
+# npm が自動導入するライブラリ本体。package-lock.json から再現できる。
 node_modules/
+# Vite が作る配布用ファイル。元のコードから npm run build で再生成する。
 dist/
+# ダウンロード用 HTML、ソース ZIP、テスト画像などの生成物。
 artifacts/
+# 開発ツールのログは履歴管理に含めない。
 *.log

@@ -1,1 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 36"><path fill="#668950" d="m16 1 15 8v18l-15 8L1 27V9Z"/><path fill="none" stroke="#eff1d6" stroke-width="2" d="m1 9 15 8 15-8M16 17v18"/></svg>
+<!-- ブラウザのタブに表示する立方体アイコン。viewBox は図形の基準となる座標範囲。 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 36">
+  <!-- 六角形の外形を緑で塗り、立方体全体の輪郭を作る。 -->
+  <path fill="#668950" d="m16 1 15 8v18l-15 8L1 27V9Z"/>
+  <!-- 明るい線を重ねて、上面・左面・右面の境界を表す。 -->
+  <path fill="none" stroke="#eff1d6" stroke-width="2" d="m1 9 15 8 15-8M16 17v18"/>
+</svg>
