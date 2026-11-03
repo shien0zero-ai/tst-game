@@ -25,6 +25,10 @@ its setup, and documentation in this repository when continuing development.
 ## Development workflow
 
 - Prepare the smallest playable version of a feature before adding extras.
+- Start with an empty inventory. Mining collects one item of the broken type;
+  successful placement consumes one item. Failed placement never consumes stock.
+  Hotbar slots reference shared finite stock; assigning shortcuts must not create
+  items or permit use of unacquired materials.
 - Explain authored code with beginner-friendly Japanese comments: describe each
   module, function, event handler, and nontrivial algorithm or UI section. Keep
   comments in sync with behavior when adding features. Explain JSON settings in

@@ -291,6 +291,55 @@
   background: #e6edcf;
 }
 
+/* 未入手の素材は個数0と薄い表示で区別し、クリックしても登録できない。 */
+.inventory-item:disabled {
+  cursor: not-allowed;
+  opacity: .5;
+  filter: grayscale(.75);
+  border-color: #82946545;
+  background: #fbfcedb3;
+}
+
+/* 空の持ち物では、素材を集める操作を先に案内する。 */
+#inventory-empty {
+  padding: 9px 12px;
+  border: 1px dashed #84976c70;
+  border-radius: 5px;
+  background: #e2e9cf;
+  color: #516844;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+/* 空スロットも選択できるが、素材の画像は出さず中央の小さい枠だけを描く。 */
+.slot.is-empty::after,
+.inventory-slot.is-empty::after {
+  content: '';
+  width: 13px;
+  height: 13px;
+  border: 1px dashed #8da17480;
+  border-radius: 2px;
+}
+
+/* 所持数は両方のホットバーに表示する。同じ素材の別スロットも同じ在庫を参照する。 */
+.slot .stack-count,
+.inventory-slot .stack-count {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  min-width: 13px;
+  padding: 1px 3px;
+  border-radius: 3px;
+  background: #203a2de6;
+  color: #fffde7;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 /* インベントリ内では、下の六つのスロットがブロックの割り当て先になる。 */
 
 .inventory-toolbar {

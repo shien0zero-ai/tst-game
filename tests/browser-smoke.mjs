@@ -121,6 +121,10 @@ try {
   assert.equal(initial.sensitivity, 100, 'A fresh browser starts at 100% sensitivity');
   assert.ok(initial.blockCount > 1000, 'The world must contain terrain and trees');
   assert.ok(initial.triangles > 0, 'Three.js must render world geometry');
+  // 開始時には素材を付与せず、採掘するまで全スロットが空であることを確認する。
+  assert.deepEqual(initial.inventorySlots, Array(6).fill(null));
+  assert.equal(initial.selectedType, null);
+  assert.deepEqual(Object.values(initial.inventoryCounts), Array(6).fill(0));
   await page.screenshot({ path: new URL('start-screen.png', artifacts).pathname });
   console.log('PASS: world loads, WebGL renders, start screen is usable');
 
@@ -172,16 +176,17 @@ try {
   });
   console.log('PASS: jump rises above the ground and lands on its surface');
 
-  // ブロック選択：数字キーとホイールで選択が変わり、草ブロックへ戻せることを確かめる。
+  // 空きスロットでも数字キーとホイールで選択でき、素材が勝手に増えないことを確認する。
   await page.keyboard.press('Digit3');
-  assert.equal((await snapshot()).selectedType, 'stone', '3 selects stone');
+  assert.equal((await snapshot()).selected, 2, '3 selects the third empty slot');
   await page.keyboard.press('Digit6');
-  assert.equal((await snapshot()).selectedType, 'sand', '6 selects sand');
+  assert.equal((await snapshot()).selected, 5, '6 selects the sixth empty slot');
   await page.mouse.wheel(0, 100);
-  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().selectedType !== 'sand');
+  await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().selected !== 5);
   await page.keyboard.press('Digit1');
-  assert.equal((await snapshot()).selectedType, 'grass', '1 selects grass');
-  console.log('PASS: number keys and mouse wheel switch the block palette');
+  assert.equal((await snapshot()).selected, 0, '1 selects the first slot');
+  assert.equal((await snapshot()).selectedType, null, 'Selecting an empty slot must not grant a material');
+  console.log('PASS: number keys and mouse wheel select empty slots without granting materials');
 
   // 破壊・設置の準備：実際にマウスを下へ動かし、少し先の地面の上面へ照準を合わせる。
   for (let step = 0; step < 20; step++) {
@@ -196,12 +201,31 @@ try {
   assert.equal(aimed.target?.normal.y, 1, 'The selected face must be the grass surface');
   assert.ok(aimed.pitch > -1.1, 'Aim far enough from the player to allow placement');
   const blockCount = aimed.blockCount;
-  // 左クリックで一つ減り、右クリックで元の個数へ戻ることで、編集操作の両方を確認する。
-  await page.mouse.click(mouse.x, mouse.y, { button: 'left' });
-  await page.waitForFunction((count) => window.__FIELDCRAFT_TEST__().blockCount === count - 1, blockCount);
+  // 未入手の状態で置こうとしても、地形も所持数も変化しない。
   await page.mouse.click(mouse.x, mouse.y, { button: 'right' });
-  await page.waitForFunction((count) => window.__FIELDCRAFT_TEST__().blockCount === count, blockCount);
-  console.log('PASS: left click breaks a block; right click places the selected block');
+  await waitFrames();
+  assert.equal((await snapshot()).blockCount, blockCount, 'Unowned items must not be placed');
+  assert.equal((await snapshot()).inventoryCounts.grass, 0);
+  // 採掘で草をちょうど1個獲得し、空のホットバーへ自動登録される。
+  await page.mouse.click(mouse.x, mouse.y, { button: 'left' });
+  await page.waitForFunction((count) => {
+    const state = window.__FIELDCRAFT_TEST__();
+    return state.blockCount === count - 1 && state.inventoryCounts.grass === 1 && state.selectedType === 'grass';
+  }, blockCount);
+  assert.equal((await snapshot()).inventorySlots[0], 'grass');
+  assert.equal((await page.locator('#hotbar button[data-slot="0"] .stack-count').textContent()).trim(), '1');
+  // 設置成功時だけ1個減り、最後の1個を使うと、その素材のスロットも空に戻る。
+  await page.mouse.click(mouse.x, mouse.y, { button: 'right' });
+  await page.waitForFunction((count) => {
+    const state = window.__FIELDCRAFT_TEST__();
+    return state.blockCount === count && state.inventoryCounts.grass === 0 && state.selectedType === null;
+  }, blockCount);
+  assert.deepEqual((await snapshot()).inventorySlots, Array(6).fill(null));
+  await page.mouse.click(mouse.x, mouse.y, { button: 'right' });
+  await waitFrames();
+  assert.equal((await snapshot()).blockCount, blockCount, 'A depleted material cannot place an extra block');
+  assert.equal((await snapshot()).inventoryCounts.grass, 0);
+  console.log('PASS: unowned placement is denied; mining gains one item; placing consumes it; depleted items cannot be reused');
 
   // 一時停止：プレイ画面を保存し、Esc の後は移動キーを押してもプレイヤーが動かないことを確かめる。
   await page.screenshot({ path: new URL('gameplay.png', artifacts).pathname });
@@ -251,6 +275,20 @@ try {
   await startOrResume();
   console.log('PASS: reset restores 100%; saved 150% persists across a reload; test leaves the default 100%');
 
+  // 再読み込み後の所持数も0。少し先の草を実際に採掘し、持ち物へ1個入れる。
+  assert.deepEqual(Object.values((await snapshot()).inventoryCounts), Array(6).fill(0));
+  for (let step = 0; step < 20; step++) {
+    const state = await snapshot();
+    if (state.target?.type === 'grass' && state.target.normal.y === 1 && state.pitch <= -0.6 && state.pitch > -1.1) break;
+    await moveMouse(0, 25);
+    await waitFrames();
+  }
+  const gatheredCount = (await snapshot()).blockCount;
+  await page.mouse.click(mouse.x, mouse.y, { button: 'left' });
+  await page.waitForFunction((count) => {
+    const state = window.__FIELDCRAFT_TEST__();
+    return state.blockCount === count - 1 && state.inventoryCounts.grass === 1;
+  }, gatheredCount);
   // Tabで持ち物を開く。表示中は移動・ワールド編集が停止することも確かめる。
   await page.keyboard.press('Tab');
   await page.waitForFunction(() => {
@@ -266,31 +304,38 @@ try {
   const stillInventory = await snapshot();
   assert.ok(horizontalDistance(inventoryState.position, stillInventory.position) < 0.01, 'Inventory must freeze movement');
   assert.equal(stillInventory.blockCount, inventoryState.blockCount, 'Inventory must prevent world edits');
-  await page.locator('#inventory-hotbar button[data-slot="0"]').click();
-  await page.locator('#inventory-grid button[data-type="stone"]').click();
+  assert.equal(stillInventory.inventoryCounts.grass, 1, 'Menu clicks must not acquire extra items');
+  assert.ok(await page.locator('#inventory-grid button[data-type="stone"]').isDisabled(), 'Uncollected stone cannot be assigned');
+  assert.ok(await page.locator('#inventory-grid button[data-type="grass"]').isEnabled(), 'Collected grass can be assigned');
+  assert.match(await page.locator('#inventory-grid button[data-type="grass"] small').textContent(), /1/);
+  assert.doesNotMatch(await page.locator('#inventory-menu').textContent(), /∞|無制限/);
+  // 同じ草を別のショートカットへ登録しても、実際の所持数は1個のままである。
+  await page.locator('#inventory-hotbar button[data-slot="2"]').click();
+  await page.locator('#inventory-grid button[data-type="grass"]').click();
   await page.waitForFunction(() => {
     const state = window.__FIELDCRAFT_TEST__();
-    return state.selected === 0 && state.inventorySlots[0] === 'stone' && state.selectedType === 'stone';
+    return state.selected === 2 && state.inventorySlots[2] === 'grass' && state.selectedType === 'grass';
   });
+  assert.equal((await snapshot()).inventoryCounts.grass, 1, 'Assigning another shortcut must not duplicate items');
+  for (const index of [0, 2]) {
+    assert.equal((await page.locator(`#inventory-hotbar button[data-slot="${index}"] .stack-count`).textContent()).trim(), '1');
+  }
   await page.screenshot({ path: new URL('inventory.png', artifacts).pathname });
   await clickAndLock('#inventory-resume');
-  assert.equal((await snapshot()).selectedType, 'stone', 'Assigned blocks must stay selected after closing inventory');
+  assert.equal((await snapshot()).selectedType, 'grass', 'The acquired material stays selected after closing inventory');
 
-  // 持ち物で割り当てた石が、実際の右クリック設置にも使われることを確認する。
-  for (let step = 0; step < 20; step++) {
-    const state = await snapshot();
-    if (state.target?.y === -1 && state.target.normal.y === 1 && state.pitch <= -0.6 && state.pitch > -1.1) break;
-    await moveMouse(0, 25);
-    await waitFrames();
-  }
+  // 集めた草を採掘した穴へ戻す。二つのショートカットがあっても置けるのは1個だけ。
   const inventoryEditCount = (await snapshot()).blockCount;
-  await page.mouse.click(mouse.x, mouse.y, { button: 'left' });
-  await page.waitForFunction((count) => window.__FIELDCRAFT_TEST__().blockCount === count - 1, inventoryEditCount);
   await page.mouse.click(mouse.x, mouse.y, { button: 'right' });
   await page.waitForFunction((count) => {
     const state = window.__FIELDCRAFT_TEST__();
-    return state.blockCount === count && state.target?.type === 'stone';
+    return state.blockCount === count + 1 && state.inventoryCounts.grass === 0 && state.target?.type === 'grass';
   }, inventoryEditCount);
+  assert.deepEqual((await snapshot()).inventorySlots, Array(6).fill(null), 'Depletion must clear every shortcut for the material');
+  await page.mouse.click(mouse.x, mouse.y, { button: 'right' });
+  await waitFrames();
+  assert.equal((await snapshot()).blockCount, inventoryEditCount + 1, 'Duplicate shortcuts must not provide additional blocks');
+  assert.equal((await snapshot()).inventoryCounts.grass, 0);
   await page.keyboard.press('Tab');
   await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().mode === 'inventory');
   await page.keyboard.press('Tab');
@@ -302,7 +347,7 @@ try {
   await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().mode === 'inventory');
   await pause();
   assert.equal((await snapshot()).mode, 'pause', 'Esc from inventory must open the pause menu');
-  console.log('PASS: Tab inventory freezes the world, assigns hotbar blocks, places stone, and resumes with pointer lock');
+  console.log('PASS: Tab inventory exposes only acquired items; shortcuts share one count; placing the last item clears all aliases');
 
   // キー設定を実際の入力で変更し、重複の拒否とEscでの取消を確認する。
   await page.locator('#keys-tab').click();
@@ -421,6 +466,10 @@ try {
   // インベントリのカードと再開ボタンも同じ高さで確認する。
   await page.keyboard.press('Tab');
   await page.waitForFunction(() => window.__FIELDCRAFT_TEST__().mode === 'inventory');
+  // 再読み込み後は空の持ち物に戻り、800×600でも状態と案内を確認できる。
+  assert.deepEqual(Object.values((await snapshot()).inventoryCounts), Array(6).fill(0));
+  for (const button of await page.locator('#inventory-grid button').all()) assert.ok(await button.isDisabled());
+  assert.doesNotMatch(await page.locator('#inventory-menu').textContent(), /∞|無制限/);
   for (const id of ['inventory-grid', 'inventory-close', 'inventory-resume']) {
     const bounds = await page.locator(`#${id}`).boundingBox();
     assert.ok(bounds && bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 800 && bounds.y + bounds.height <= 600,

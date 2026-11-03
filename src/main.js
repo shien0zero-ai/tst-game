@@ -13,6 +13,7 @@ import { createSensitivitySettings } from './settings.js';
 import { createKeybindingsSettings, formatKey } from './keybindings.js';
 import { createKeybindPanel } from './keybind-panel.js';
 import { createInventory } from './inventory.js';
+import { mineBlock, placeBlock } from './block-actions.js';
 import { createFpsCounter } from './fps.js';
 
 // 内部のブロック名を表示用の日本語へ変換する。$ は id で HTML を探す省略形。
@@ -97,26 +98,39 @@ function showSettingsTab(tab) {
 $('mouse-tab').addEventListener('click', () => showSettingsTab('mouse'));
 $('keys-tab').addEventListener('click', () => showSettingsTab('keys'));
 
-// 二つの画面にあるホットバーを、同じインベントリの状態へそろえる。
+// 二つのホットバーと素材一覧へ、同じ所持数を表示する。空のスロットは画像を隠す。
 function refreshInventory() {
   const slots = inventory.slots;
   for (const container of [$('hotbar'), $('inventory-hotbar')]) {
     [...container.children].forEach((button, index) => {
       const type = slots[index];
       const label = formatKey(bindings.get(`slot${index + 1}`));
-      button.dataset.type = type;
+      const count = inventory.count(type);
+      button.dataset.type = type ?? '';
+      button.classList.toggle('is-empty', !type);
       button.classList.toggle('selected', index === inventory.selected);
       button.setAttribute('aria-pressed', String(index === inventory.selected));
-      button.setAttribute('aria-label', `${index + 1}: ${NAMES[type]}`);
-      button.title = `${label} · ${NAMES[type]}`;
+      button.setAttribute('aria-label', `${index + 1}: ${type ? `${NAMES[type]} ${count}個` : '空きスロット'}`);
+      button.title = `${label} · ${type ? `${NAMES[type]} ${count}個` : '空きスロット'}`;
       button.querySelector('span').textContent = label;
-      button.querySelector('img').src = icons.get(type);
+      const image = button.querySelector('img');
+      image.hidden = !type;
+      if (type) image.src = icons.get(type);
+      else image.removeAttribute('src');
+      const amount = button.querySelector('.stack-count');
+      amount.hidden = !type;
+      amount.textContent = type ? count : '';
     });
   }
   [...$('inventory-grid').children].forEach(button => {
+    const count = inventory.count(button.dataset.type);
+    button.disabled = count === 0;
+    button.querySelector('small').textContent = count > 0 ? `所持 ${count}個` : '未入手（0個）';
+    button.title = count > 0 ? `${NAMES[button.dataset.type]}をスロットに割り当てる` : 'ブロックを壊して入手してください';
     button.setAttribute('aria-pressed', String(button.dataset.type === inventory.selectedType));
   });
-  $('selected-name').textContent = NAMES[inventory.selectedType];
+  $('inventory-empty').hidden = Object.values(inventory.counts).some(count => count > 0);
+  $('selected-name').textContent = inventory.selectedType ? NAMES[inventory.selectedType] : '空きスロット';
 }
 function selectBlock(index) {
   inventory.select(index);
@@ -135,7 +149,9 @@ function buildInventoryUI() {
       const number = document.createElement('span');
       const image = document.createElement('img');
       image.alt = '';
-      button.append(number, image);
+      const amount = document.createElement('small');
+      amount.className = 'stack-count';
+      button.append(number, image, amount);
       button.addEventListener('click', () => selectBlock(index));
       container.append(button);
     });
@@ -152,11 +168,14 @@ function buildInventoryUI() {
     name.className = 'name';
     name.textContent = NAMES[type];
     const amount = document.createElement('small');
-    amount.textContent = '∞ 無制限';
+    amount.textContent = '未入手（0個）';
     button.append(image, name, amount);
-    // 選択中のスロットへ素材を登録する。画面は閉じず、続けて並べ替えられる。
+    // 入手済みの素材だけを登録する。複数スロットへ登録しても所持数は増やさない。
     button.addEventListener('click', () => {
-      inventory.assign(type);
+      if (!inventory.assign(type)) {
+        $('inventory-note').textContent = `「${NAMES[type]}」は持っていません。ブロックを壊して入手してください。`;
+        return;
+      }
       refreshInventory();
       $('inventory-note').textContent = `${inventory.selected + 1}番のスロットに「${NAMES[type]}」を入れました。`;
     });
@@ -185,7 +204,8 @@ function showMode(next) {
     $('mouse-sensitivity').focus({ preventScroll: true });
   } else if (next === 'inventory') {
     refreshInventory();
-    $('inventory-grid').firstElementChild?.focus({ preventScroll: true });
+    // 持ち物が空のときは素材ボタンがすべて無効なので、閉じるボタンへ移動する。
+    ($('inventory-grid').querySelector('button:not(:disabled)') ?? $('inventory-close')).focus({ preventScroll: true });
   }
 }
 
@@ -227,20 +247,29 @@ function refreshTarget() {
   if (target) $('target-label').textContent = `${NAMES[target.type]} · ${target.distance.toFixed(1)} m`;
 }
 
-// 左で破壊、右で設置。素材は固定の一覧ではなく、現在のホットバーから読む。
+// 採掘と設置で、地形と持ち物を一緒に更新する。失敗した設置では消費しない。
 function editBlock(button) {
   refreshTarget();
   if (!target) { notify('ブロックに近づいて、照準を合わせてください'); return; }
-  let changed = false;
-  if (button === 0) changed = world.remove(target.x, target.y, target.z);
+  let result;
+  if (button === 0) {
+    result = mineBlock(world, inventory, target.x, target.y, target.z);
+    if (result.ok) notify(`${NAMES[result.type]}を1個入手しました（所持 ${inventory.count(result.type)}個）`);
+    else notify('このブロックは入手できませんでした');
+  }
   if (button === 2) {
+    const type = inventory.selectedType;
+    if (!type || inventory.count(type) === 0) {
+      notify('設置するアイテムがありません。左クリックでブロックを集めてください');
+      return;
+    }
     const { normal } = target;
     const x = target.x + normal.x, y = target.y + normal.y, z = target.z + normal.z;
     if (player.intersectsBlock(x, y, z)) { notify('自分と重なる場所には置けません'); return; }
-    changed = world.set(x, y, z, inventory.selectedType);
-    if (!changed) notify('ここにはブロックを置けません');
+    result = placeBlock(world, inventory, type, x, y, z);
+    if (!result.ok) notify('ここにはブロックを置けません');
   }
-  if (changed) { view.rebuild(world); refreshTarget(); }
+  if (result?.ok) { view.rebuild(world); refreshInventory(); refreshTarget(); }
 }
 
 // メニュー中のマウス移動は視点へ反映しない。上下角は裏返らない範囲に制限する。
@@ -342,7 +371,7 @@ if (new URLSearchParams(location.search).has('test')) {
     ready, locked, mode, position: player ? { ...player.position } : null,
     grounded: player?.grounded ?? false, yaw, pitch, sensitivity: sensitivity.value,
     bindings: bindings.bindings, fps: fpsCounter.fps, selected: inventory.selected,
-    inventorySlots: inventory.slots, selectedType: inventory.selectedType,
+    inventorySlots: inventory.slots, inventoryCounts: inventory.counts, selectedType: inventory.selectedType,
     target: target ? { ...target, normal: { ...target.normal } } : null,
     blockCount: world?.blocks.size ?? 0,
     renderCalls: view?.renderer.info.render.calls ?? 0,

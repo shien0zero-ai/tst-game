@@ -66,16 +66,18 @@
           <div id="intro-controls" class="intro-controls"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移動</span><span><kbd>SPACE</kbd> ジャンプ</span><span><span class="mouse-glyph">◧</span> マウスで見回す</span></div>
         </div>
         <!-- スタート画面のワールド紹介。停止画面や小さいウィンドウでは非表示。 -->
-        <aside class="world-card"><span class="world-number">01 / PLAINS</span><h2>はじまりの草原</h2><p>風景は、あなたのアイデアを待っている。</p><div class="world-tags"><span>自由に建築</span><span>6種類のブロック</span><span>時間制限なし</span></div></aside>
+        <aside class="world-card"><span class="world-number">01 / PLAINS</span><h2>はじまりの草原</h2><p>風景は、あなたのアイデアを待っている。</p><div class="world-tags"><span>採掘して建築</span><span>素材を集めよう</span><span>時間制限なし</span></div></aside>
       </section>
       <!-- インベントリ中はマウスを解放し、ブロック選択とホットバーの並べ替えを行う。 -->
       <section id="inventory-menu" class="inventory-overlay" role="dialog" aria-modal="true" aria-labelledby="inventory-title" hidden>
         <div class="inventory-dialog">
-          <div class="inventory-heading"><div><span class="world-number">CREATIVE INVENTORY</span><h2 id="inventory-title">インベントリ</h2></div><button id="inventory-close" type="button" aria-label="インベントリを閉じる">×</button></div>
-          <p class="inventory-description">ブロックは無制限。好きな素材をホットバーに入れて、自由につくろう。</p>
-          <div id="inventory-grid" class="inventory-grid" aria-label="使えるブロック"></div>
+          <div class="inventory-heading"><div><span class="world-number">COLLECTED ITEMS</span><h2 id="inventory-title">インベントリ</h2></div><button id="inventory-close" type="button" aria-label="インベントリを閉じる">×</button></div>
+          <p class="inventory-description">壊したブロックを集めて建築しよう。設置すると1個使います。</p>
+          <!-- 初期所持数はゼロ。未入手の素材は選べず、最初の採掘方法を案内する。 -->
+          <p id="inventory-empty" class="inventory-empty">まだアイテムを持っていません。左クリックでブロックを壊して集めましょう。</p>
+          <div id="inventory-grid" class="inventory-grid" aria-label="素材と所持数"></div>
           <div class="inventory-toolbar"><span>割り当てるスロットを選択</span><div id="inventory-hotbar" class="inventory-hotbar" role="toolbar" aria-label="インベントリ内のホットバー"></div></div>
-          <p id="inventory-note" class="inventory-note" role="status">下のスロットを選び、ブロックをクリックすると割り当てられます。</p>
+          <p id="inventory-note" class="inventory-note" role="status">下のスロットを選び、入手済みの素材をクリックすると割り当てられます。</p>
           <button id="inventory-resume" class="play-button" type="button"><span>ゲームにもどる</span><span aria-hidden="true">↗</span></button>
           <p id="inventory-controls" class="inventory-controls">Tab で閉じる · Esc で設定へ</p>
         </div>

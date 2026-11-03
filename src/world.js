@@ -6,7 +6,7 @@
 export const WORLD_BOUNDS = Object.freeze({ minX: -32, maxX: 31, minY: -4, maxY: 31, minZ: -32, maxZ: 31 });
 // プレイヤーの初期位置。y は目の高さではなく足元の高さで、草の表面が y=0。
 export const SPAWN = Object.freeze({ x: 0.5, y: 0, z: 7.5 });
-// ゲームで使用できるブロック名。並び順はブロックパレットの 1〜6 番に対応する。
+// ゲーム内の素材名と一覧の順序。ホットバーには、採掘した素材が入手順で登録される。
 export const BLOCK_TYPES = Object.freeze(['grass', 'dirt', 'stone', 'wood', 'leaves', 'sand']);
 
 // 3 つの数値を、Map のキーに使える「x,y,z」という文字列へ変換する。
